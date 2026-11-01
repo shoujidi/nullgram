@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="NullgramRepeatTitle">重复发送</string>
+    <string name="NullgramRepeatCount">重复次数（次）</string>
+    <string name="NullgramRepeatInterval">发送间隔（秒）</string>
+    <string name="NullgramRepeatStart">开始发送</string>
+    <string name="NullgramRepeatStop">停止重复</string>
+    <string name="NullgramRepeatCancel">取消</string>
+    <string name="NullgramRepeatExisting">已有消息复读</string>
+    <string name="NullgramRepeatNew">新消息重复发送</string>
+    <string name="NullgramRepeatProgress">%1$s · 已提交 %2$d/%3$d · 剩余 %4$d\n服务器已确认 %5$d 轮（%6$d/%7$d 条消息）</string>
+    <string name="NullgramRepeatInvalid">请输入 %1$d–%2$d 次，间隔 %3$s–%4$s 秒。</string>
+    <string name="NullgramRepeatBusy">当前账号已有正在运行的重复发送任务。</string>
+    <string name="NullgramRepeatFailed">重复发送已停止：%1$s</string>
+    <string name="NullgramRepeatUnsupported">此内容或会话暂不支持重复发送；受保护内容、付费消息和特殊发送模式不支持。</string>
+    <string name="NullgramRepeatGroup">已选 %1$d 条消息（每轮重复整组消息）</string>
+    <string name="NullgramRepeatTimeout">等待服务器确认超时，已停止，不会自动重试。</string>
+    <string name="NullgramRepeatDenied">账号、连接状态或聊天权限发生变化，请检查慢速模式和 Telegram 限制。</string>
+    <string name="NullgramRepeatRateLimit">Telegram 限速：%1$s。任务已停止。</string>
+    <string name="NullgramIconDefault">Nullgram</string>
+    <string name="NullgramIconLight">Nullgram 浅色</string>
+    <string name="NullgramIconDark">Nullgram 深色</string>
+    <string name="NullgramKeywordTitle">关键词提醒</string>
+    <string name="NullgramKeywordEnabled">启用关键词提醒</string>
+    <string name="NullgramKeywordAdd">添加关键词</string>
+    <string name="NullgramKeywordDelete">删除关键词</string>
+    <string name="NullgramKeywordInfo">仅监听开启时绑定的单个账号。更换监听账号：关闭后切换账号再开启。普通文字包含匹配，忽略英文字母大小写；包含静音和归档聊天。不扫描历史，不增加后台服务；通知受系统权限及渠道设置控制。</string>
+    <string name="NullgramKeywordNoAccount">首次开启时绑定当前已登录账号。</string>
+    <string name="NullgramKeywordAccount">监听账号用户 ID：%1$d</string>
+    <string name="NullgramKeywordLimits">每个关键词 1–128 个字符，最多 100 个；不允许空白关键词。</string>
+    <string name="NullgramKeywordLogin">请先登录要监听的账号。</string>
+    <string name="NullgramKeywordSaveFailed">关键词配置保存失败。</string>
+    <string name="NullgramKeywordLocked">收到关键词消息，请解锁查看。</string>
+    <string name="NullgramUpstreamCommunity">上游社区</string>
+    <string name="NullgramUpstreamChannel">Niagram 上游频道</string>
+    <string name="NullgramUpstreamSource">Niagram 上游源码</string>
+    <string name="NullgramLicense">GPLv3 许可证</string>
+    <string name="NullgramSourceNotice">Nullgram 基于 Niagram（原 NiagramX）修改，基底提交 bc99e5e9907a2ea47d9e6ed432469b8ff553644f，修改日期 2026-11-01。不是 Niagram、NagramX、Nagram、Nekogram 或 Telegram 的官方版本，与其无隶属或背书关系。保留上游及第三方版权和许可，源码按 GPLv3 提供。分发 APK 时同时提供匹配的完整源码和构建说明。为兼容保留安装包名，Nullgram 显示名标识本 Fork；图标保留原作品归属，另提供独立 Nullgram 图标。</string>
+    <string name="NullgramFontPreview">Nullgram 是基于 Telegram 的客户端。</string>
+    <string name="NullgramCompatibleParser">兼容解析器</string>
+    <string name="NullgramNiagramIconDefault">NiagramX（默认）</string>
+</resources>

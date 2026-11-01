@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="NullgramRepeatTitle">Repeat send</string>
+    <string name="NullgramRepeatCount">Repetitions (times)</string>
+    <string name="NullgramRepeatInterval">Interval (seconds)</string>
+    <string name="NullgramRepeatStart">Start sending</string>
+    <string name="NullgramRepeatStop">Stop repeat</string>
+    <string name="NullgramRepeatCancel">Cancel</string>
+    <string name="NullgramRepeatExisting">Existing messages</string>
+    <string name="NullgramRepeatNew">New message</string>
+    <string name="NullgramRepeatProgress">%1$s · submitted %2$d/%3$d · remaining %4$d\nServer confirmed %5$d rounds (%6$d/%7$d messages)</string>
+    <string name="NullgramRepeatInvalid">Enter %1$d–%2$d repetitions and %3$s–%4$s seconds.</string>
+    <string name="NullgramRepeatBusy">This account already has an active repeat task.</string>
+    <string name="NullgramRepeatFailed">Repeat stopped: %1$s</string>
+    <string name="NullgramRepeatUnsupported">This content or destination cannot be repeated. Protected content, paid messages and special send modes are excluded.</string>
+    <string name="NullgramRepeatGroup">%1$d selected messages (the whole selection repeats each round)</string>
+    <string name="NullgramRepeatTimeout">Server confirmation timed out; no automatic retry.</string>
+    <string name="NullgramRepeatDenied">Account, connection or chat permissions changed. Check slow mode and Telegram limits.</string>
+    <string name="NullgramRepeatRateLimit">Telegram rate limit: %1$s. The task has stopped.</string>
+    <string name="NullgramIconDefault">Nullgram</string>
+    <string name="NullgramIconLight">Nullgram Light</string>
+    <string name="NullgramIconDark">Nullgram Dark</string>
+    <string name="NullgramKeywordTitle">Keyword reminders</string>
+    <string name="NullgramKeywordEnabled">Enable keyword reminders</string>
+    <string name="NullgramKeywordAdd">Add keyword</string>
+    <string name="NullgramKeywordDelete">Delete keyword</string>
+    <string name="NullgramKeywordInfo">Only the account bound when enabled is monitored. To change accounts, disable, switch accounts, then enable. Literal matching ignores English letter case. Muted and archived chats are included. No history scanning or extra background service. Notifications obey Android permission and channel settings.</string>
+    <string name="NullgramKeywordNoAccount">The current logged-in account is bound on first enable.</string>
+    <string name="NullgramKeywordAccount">Monitored account user ID: %1$d</string>
+    <string name="NullgramKeywordLimits">Use 1–128 characters per keyword, up to 100 keywords. Blank keywords are not allowed.</string>
+    <string name="NullgramKeywordLogin">Log into the account before enabling reminders.</string>
+    <string name="NullgramKeywordSaveFailed">Could not save the keyword configuration.</string>
+    <string name="NullgramKeywordLocked">New keyword message. Unlock to view.</string>
+    <string name="NullgramUpstreamCommunity">Upstream community</string>
+    <string name="NullgramUpstreamChannel">Niagram upstream channel</string>
+    <string name="NullgramUpstreamSource">Niagram upstream source</string>
+    <string name="NullgramLicense">GPLv3 license</string>
+    <string name="NullgramSourceNotice">Nullgram is independently modified from Niagram (formerly NiagramX), revision bc99e5e9907a2ea47d9e6ed432469b8ff553644f. Modified 2026-11-01. It is not an official release of Niagram, NagramX, Nagram, Nekogram or Telegram. Copyright and third-party notices are preserved. Source is licensed under GPLv3; matching complete source and build instructions accompany the APK distribution. The application ID is retained for compatibility; the Nullgram display name identifies this independent fork; launcher artwork retains its original attribution, with optional independent Nullgram icons.</string>
+    <string name="NullgramFontPreview">Nullgram is a Telegram client mod.</string>
+    <string name="NullgramCompatibleParser">Compatibility parser</string>
+    <string name="NullgramNiagramIconDefault">NiagramX (default)</string>
+</resources>

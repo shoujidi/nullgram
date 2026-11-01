@@ -1,0 +1,157 @@
+name: Release Build
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+      - '!.github/workflows/release.yml'
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: 'Skip Upload: Set to "y" to skip uploading the build.'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Gradle Build (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [universal, arm64-v8a, x86_64]
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_HARDLINK: "true"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_MAXSIZE: "10G"
+      CCACHE_SLOPPINESS: "include_file_ctime,include_file_mtime,time_macros"
+      CCACHE_BASEDIR: "${{ github.workspace }}"
+      NATIVE_TARGET: ${{ matrix.target }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          submodules: recursive
+      - name: Apply native patches
+        working-directory: TMessagesProj/jni
+        run: ./patches/tgcalls.sh
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'microsoft'
+          java-version: '21'
+      - name: Set up Ccache
+        uses: hendrikmuhs/ccache-action@v1.2.23
+        with:
+          key: ${{ github.workflow }}-${{ matrix.target }}-${{ github.ref_name }}
+          restore-keys: |
+            ${{ github.workflow }}-${{ matrix.target }}-
+            ${{ matrix.target }}-
+          append-timestamp: false
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4.0.1
+        with:
+          cmdline-tools-version: 14742923
+          packages: ''
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses
+      - name: Install SDK 37 & NDK
+        run: |
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-37.0"
+          sdkmanager "build-tools;37.0.0"
+          sdkmanager "ndk;27.2.12479018"
+      - name: Install Native Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes nasm
+      - name: Configure Android SDK Path
+        run: |
+          echo "sdk.dir=${ANDROID_HOME}" >> local.properties
+      - name: Modify Gradle JVM Args
+        run: |
+          MEMORY_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+          MEMORY_GB=$((MEMORY_KB / 1024 / 1024))
+          echo "Detected memory size: ${MEMORY_GB}GB"
+          if [ $MEMORY_GB -ge 12 ]; then
+            sed -i '/^org\.gradle\.jvmargs=/d' gradle.properties
+            echo "" >> gradle.properties
+            echo "org.gradle.jvmargs=-Xmx8G -XX:MaxMetaspaceSize=2G -XX:+UseParallelGC -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" >> gradle.properties
+          elif [ $MEMORY_GB -ge 6 ]; then
+            sed -i '/^org\.gradle\.jvmargs=/d' gradle.properties
+            echo "" >> gradle.properties
+            echo "org.gradle.jvmargs=-Xmx5G -XX:MaxMetaspaceSize=1536M -XX:+UseParallelGC -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" >> gradle.properties
+          fi
+      - name: Release Build
+        id: release_build_step
+        env:
+          COMMIT_ID: ${{ github.event.head_commit.id }}
+          LOCAL_PROPERTIES: ${{ secrets.LOCAL_PROPERTIES }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
+          ALIAS_NAME: ${{ vars.ALIAS_NAME || secrets.ALIAS_NAME }}
+          ALIAS_PASS: ${{ secrets.ALIAS_PASS }}
+        run: |
+          if [ -n "$LOCAL_PROPERTIES" ]; then
+            echo "$LOCAL_PROPERTIES" | base64 -d >> local.properties
+          fi
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > TMessagesProj/release.keystore
+          fi
+          ./gradlew TMessagesProj:assembleRelease --build-cache --parallel
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Release-${{ matrix.target }}
+          path: TMessagesProj/build/outputs/apk/release/*-${{ matrix.target }}.apk
+
+  upload:
+    name: Upload release
+    if: github.event.inputs.upload != 'y' && !contains(github.event.head_commit.message, '[skip upload]')
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Download Artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Send to Telegram
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_HASH: ${{ secrets.APP_HASH }}
+          COMMIT_ID: ${{ github.event.head_commit.id }}
+          COMMIT_URL: ${{ github.event.head_commit.url }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          if [ -z "${{ secrets.HELPER_BOT_TOKEN }}" ] || [ -z "${{ secrets.HELPER_BOT_TARGET }}" ]; then
+            echo "::warning::HELPER_BOT_TOKEN or HELPER_BOT_TARGET not configured, skipping Telegram upload."
+            exit 0
+          fi
+
+          # Sync runner clock with Telegram server to prevent MTProto msg_id timestamp drift
+          TG_DATE=$(curl -sI https://api.telegram.org | grep -i '^date:' | cut -d' ' -f2- || true)
+          if [ -n "$TG_DATE" ]; then
+            echo "Syncing runner time with Telegram server: $TG_DATE"
+            sudo date -s "$TG_DATE" || true
+          fi
+
+          export BUILD_TIMESTAMP=$(date +%s)
+          python -m pip install -r Tools/scripts/requirements.txt
+          python Tools/scripts/upload.py "${{ secrets.HELPER_BOT_TOKEN }}" "${{ secrets.HELPER_BOT_TARGET }}" release "${{ secrets.HELPER_BOT_CANARY_TARGET }}"

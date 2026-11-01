@@ -1,0 +1,72 @@
+name: Pull request
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths-ignore:
+      - '**.md'
+      - '**.xml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Gradle Build
+    runs-on: ubuntu-latest
+    env:
+      NATIVE_TARGET: "arm64-v8a"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          submodules: recursive
+      - name: Apply native patches
+        working-directory: TMessagesProj/jni
+        run: ./patches/tgcalls.sh
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4.0.1
+        with:
+          cmdline-tools-version: 14742923
+          packages: ''
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses
+      - name: Install SDK 37 & NDK
+        run: |
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-37.0"
+          sdkmanager "build-tools;37.0.0"
+          sdkmanager "ndk;27.2.12479018"
+      - name: Configure Android SDK Path
+        run: |
+          echo "sdk.dir=${ANDROID_HOME}" >> local.properties
+      - name: Modify Gradle JVM Args
+        run: |
+          MEMORY_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+          MEMORY_GB=$((MEMORY_KB / 1024 / 1024))
+          echo "Detected memory size: ${MEMORY_GB}GB"
+          if [ $MEMORY_GB -ge 12 ]; then
+            sed -i '/^org\.gradle\.jvmargs=/d' gradle.properties
+            echo "" >> gradle.properties
+            echo "org.gradle.jvmargs=-Xmx8G -XX:MaxMetaspaceSize=2G -XX:+UseParallelGC -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" >> gradle.properties
+          fi
+      - name: Debug Build
+        run: |
+          export DEBUG_BUILD=true
+          ./gradlew TMessagesProj:assembleDebug
+          APK=$(find TMessagesProj/build/outputs/apk -name '*arm64-v8a*.apk')
+          APK=$(dirname $APK)
+          echo "APK=$APK" >> $GITHUB_ENV
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: Debug
+          path: ${{ env.APK }}

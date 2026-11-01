@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "114307471653",
+    "project_id": "niagramx",
+    "storage_bucket": "niagramx.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:114307471653:android:dc7504c01ea07209c1a2cc",
+        "android_client_info": {
+          "package_name": "top.nkbe.niagram"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCccLMzoChqnzuRKGAM7OqjfWUUCKkJoZo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

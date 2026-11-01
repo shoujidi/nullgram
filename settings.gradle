@@ -1,0 +1,38 @@
+pluginManagement {
+    includeBuild('TMessagesProj_Modules/media/build-logic-settings')
+    repositories {
+        google {
+            content {
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+    id 'gradlebuild.media3-settings-logic'
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "Nullgram"
+include ':TMessagesProj'
+include ':libs:tcp2ws'
+include ':jlatexmath'
+project(':jlatexmath').projectDir = file('TMessagesProj/lib/jlatexmath/jlatexmath')
+def rootLocalProps = file('local.properties')
+def mediaLocalProps = file('TMessagesProj_Modules/media/local.properties')
+if (rootLocalProps.exists() && !mediaLocalProps.exists()) {
+    mediaLocalProps.text = rootLocalProps.text
+}
+includeMedia3.execute(file('TMessagesProj_Modules/media'))
