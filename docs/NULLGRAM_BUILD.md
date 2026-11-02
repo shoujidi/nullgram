@@ -71,7 +71,8 @@ Installation and any account login are performed manually by the user.
 
 Nullgram Blue (`NullgramIcon`) is the default. All 15 upstream launcher options remain available,
 including their original selection behavior. Three supplied Nullgram artwork variants (Blue, Mint, Black) are included,
-for 18 total public choices. Personal photo artwork is excluded from the public source and APK.
+for 19 total choices including the optional portrait thumbnail.
+The portrait photograph is copyrighted by its provider. Only one 96x96 low-quality JPEG without EXIF is distributed; no original/high-resolution photograph or photo preview is published. See the in-app source notice and `TMessagesProj/src/main/assets/nullgram/AVATAR_COPYRIGHT.txt`.
 The blue startup artwork exits when the first content layout is ready, with a maximum of 2 seconds. Select an icon in **Settings → Chat Settings → App Icon**.
 Upstream premium-only choices retain their original restrictions. No restricted Nagram-exclusive
 artwork is added. Application display name and installation package are unchanged.

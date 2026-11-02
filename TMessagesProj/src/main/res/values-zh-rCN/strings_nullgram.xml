@@ -35,8 +35,9 @@
     <string name="NullgramUpstreamChannel">Niagram 上游频道</string>
     <string name="NullgramUpstreamSource">Niagram 上游源码</string>
     <string name="NullgramLicense">GPLv3 许可证</string>
-    <string name="NullgramSourceNotice">Nullgram 基于 Niagram（原 NiagramX）修改，基底提交 bc99e5e9907a2ea47d9e6ed432469b8ff553644f，修改日期 2026-11-01。不是 Niagram、NagramX、Nagram、Nekogram 或 Telegram 的官方版本，与其无隶属或背书关系。保留上游及第三方版权和许可，源码按 GPLv3 提供。分发 APK 时同时提供匹配的完整源码和构建说明。为兼容保留安装包名，Nullgram 显示名标识本 Fork；图标保留原作品归属，另提供独立 Nullgram 图标。</string>
+    <string name="NullgramSourceNotice">Nullgram 基于 Niagram（原 NiagramX）修改，基底提交 bc99e5e9907a2ea47d9e6ed432469b8ff553644f，修改日期 2026-11-01。不是 Niagram、NagramX、Nagram、Nekogram 或 Telegram 的官方版本，与其无隶属或背书关系。保留上游及第三方版权和许可，源码按 GPLv3 提供。分发 APK 时同时提供匹配的完整源码和构建说明。为兼容保留安装包名，Nullgram 显示名标识本 Fork；图标保留原作品归属，另提供独立 Nullgram 图标。 此专属头像照片版权归提供照片的用户本人所有，保留所有权利。公开版本仅含96×96低画质缩略图，原图及高清版本不公开。</string>
     <string name="NullgramFontPreview">Nullgram 是基于 Telegram 的客户端。</string>
     <string name="NullgramCompatibleParser">兼容解析器</string>
     <string name="NullgramNiagramIconDefault">NiagramX</string>
+    <string name="NullgramIconPhoto">专属头像（版权所有）</string>
 </resources>

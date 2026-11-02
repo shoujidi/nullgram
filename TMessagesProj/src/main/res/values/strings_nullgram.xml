@@ -35,8 +35,9 @@
     <string name="NullgramUpstreamChannel">Niagram upstream channel</string>
     <string name="NullgramUpstreamSource">Niagram upstream source</string>
     <string name="NullgramLicense">GPLv3 license</string>
-    <string name="NullgramSourceNotice">Nullgram is independently modified from Niagram (formerly NiagramX), revision bc99e5e9907a2ea47d9e6ed432469b8ff553644f. Modified 2026-11-01. It is not an official release of Niagram, NagramX, Nagram, Nekogram or Telegram. Copyright and third-party notices are preserved. Source is licensed under GPLv3; matching complete source and build instructions accompany the APK distribution. The application ID is retained for compatibility; the Nullgram display name identifies this independent fork; launcher artwork retains its original attribution, with optional independent Nullgram icons.</string>
+    <string name="NullgramSourceNotice">Nullgram is independently modified from Niagram (formerly NiagramX), revision bc99e5e9907a2ea47d9e6ed432469b8ff553644f. Modified 2026-11-01. It is not an official release of Niagram, NagramX, Nagram, Nekogram or Telegram. Copyright and third-party notices are preserved. Source is licensed under GPLv3; matching complete source and build instructions accompany the APK distribution. The application ID is retained for compatibility; the Nullgram display name identifies this independent fork; launcher artwork retains its original attribution, with optional independent Nullgram icons. Copyright in the portrait photograph belongs to the user who supplied it. All rights reserved. Only a low-quality 96x96 thumbnail is distributed; the original and high-resolution images remain private.</string>
     <string name="NullgramFontPreview">Nullgram is a Telegram client mod.</string>
     <string name="NullgramCompatibleParser">Compatibility parser</string>
     <string name="NullgramNiagramIconDefault">NiagramX</string>
+    <string name="NullgramIconPhoto">Nullgram Portrait ©</string>
 </resources>

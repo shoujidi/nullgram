@@ -115,7 +115,7 @@ public class NullgramBrandingTest {
         org.telegram.ui.LauncherIconController.tryFixLauncherIconIfNeeded();
         assertEquals(org.telegram.ui.LauncherIconController.LauncherIcon.SPACE, org.telegram.ui.LauncherIconController.getCurrentIcon());
         assertEquals(android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, manager.getComponentEnabledSetting(legacy));
-        assertEquals(18, org.telegram.ui.LauncherIconController.LauncherIcon.values().length);
+        assertEquals(19, org.telegram.ui.LauncherIconController.LauncherIcon.values().length);
         for (org.telegram.ui.LauncherIconController.LauncherIcon icon : org.telegram.ui.LauncherIconController.LauncherIcon.values()) {
             org.telegram.ui.LauncherIconController.setIcon(icon);
             assertEquals(icon, org.telegram.ui.LauncherIconController.getCurrentIcon());
@@ -148,12 +148,44 @@ public class NullgramBrandingTest {
         }
         assertEquals(org.telegram.ui.LauncherIconController.LauncherIcon.NULLGRAM, org.telegram.ui.LauncherIconController.getCurrentIcon());
         assertEquals(R.mipmap.ic_launcher_nullgram, manager.getApplicationInfo(context.getPackageName(), 0).icon);
-        org.telegram.ui.LauncherIconController.LauncherIcon explicitChoice = org.telegram.ui.LauncherIconController.LauncherIcon.DARK;
+        org.telegram.ui.LauncherIconController.LauncherIcon explicitChoice = org.telegram.ui.LauncherIconController.LauncherIcon.PHOTO;
         manager.setComponentEnabledSetting(explicitChoice.getComponentName(context), android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 1);
         org.telegram.ui.LauncherIconController.tryFixLauncherIconIfNeeded();
         assertEquals(explicitChoice, org.telegram.ui.LauncherIconController.getCurrentIcon());
         for (org.telegram.ui.LauncherIconController.LauncherIcon icon : org.telegram.ui.LauncherIconController.LauncherIcon.values()) {
             assertEquals(icon == explicitChoice, org.telegram.ui.LauncherIconController.isEnabled(icon));
+        }
+    }
+
+    @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    public void portraitIsOnlySmallLowQualityArtworkWithCopyrightNotice() throws Exception {
+        android.content.Context context = ApplicationLoader.applicationContext;
+        android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        android.graphics.BitmapFactory.decodeResource(context.getResources(), R.drawable.nullgram_avatar_thumbnail, bounds);
+        assertEquals(96, bounds.outWidth);
+        assertEquals(96, bounds.outHeight);
+        assertEquals("image/jpeg", bounds.outMimeType);
+        try (InputStream input = context.getResources().openRawResource(R.drawable.nullgram_avatar_thumbnail)) {
+            ByteArrayOutputStream data = new ByteArrayOutputStream();
+            byte[] buffer = new byte[1024]; int count;
+            while ((count = input.read(buffer)) != -1) data.write(buffer, 0, count);
+            assertTrue(data.size() < 4096);
+        }
+        try (InputStream input = context.getAssets().open("nullgram/AVATAR_COPYRIGHT.txt")) {
+            ByteArrayOutputStream data = new ByteArrayOutputStream();
+            byte[] buffer = new byte[1024]; int count;
+            while ((count = input.read(buffer)) != -1) data.write(buffer, 0, count);
+            String notice = new String(data.toByteArray(), StandardCharsets.UTF_8);
+            assertTrue(notice.contains("版权"));
+            assertTrue(notice.contains("96"));
+        }
+        for (Locale locale : new Locale[]{Locale.ENGLISH, Locale.SIMPLIFIED_CHINESE}) {
+            ReflectionHelpers.setField(controller, "currentLocale", locale);
+            String sourceNotice = LocaleController.getString(R.string.NullgramSourceNotice);
+            assertTrue(sourceNotice, sourceNotice.contains("96"));
+            assertFalse(LocaleController.getString(R.string.NullgramIconPhoto).startsWith("LOC_ERR"));
         }
     }
 }

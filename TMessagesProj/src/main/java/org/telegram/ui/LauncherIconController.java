@@ -89,7 +89,8 @@ public class LauncherIconController {
         NOX("NoxIcon", R.mipmap.icon_2_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconNox, true, R.mipmap.icon_2_launcher),
         NULLGRAM("NullgramIcon", R.drawable.nullgram_icon_background, R.drawable.nullgram_icon_foreground, R.string.NullgramIconDefault, R.mipmap.ic_launcher_nullgram),
         LIGHT("NullgramLightIcon", R.drawable.nullgram_icon_light_background, R.drawable.nullgram_icon_light_foreground, R.string.NullgramIconLight, R.mipmap.ic_launcher_nullgram_light),
-        DARK("NullgramDarkIcon", R.drawable.nullgram_icon_dark_background, R.drawable.nullgram_icon_dark_foreground, R.string.NullgramIconDark, R.mipmap.ic_launcher_nullgram_dark);
+        DARK("NullgramDarkIcon", R.drawable.nullgram_icon_dark_background, R.drawable.nullgram_icon_dark_foreground, R.string.NullgramIconDark, R.mipmap.ic_launcher_nullgram_dark),
+        PHOTO("NullgramPhotoIcon", R.drawable.nullgram_photo_background, R.drawable.nullgram_photo_foreground, R.string.NullgramIconPhoto, R.mipmap.ic_launcher_nullgram_photo);
 
         public final String key;
         public final int background;
