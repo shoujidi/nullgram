@@ -17,9 +17,9 @@
     <string name="NullgramRepeatTimeout">Server confirmation timed out; no automatic retry.</string>
     <string name="NullgramRepeatDenied">Account, connection or chat permissions changed. Check slow mode and Telegram limits.</string>
     <string name="NullgramRepeatRateLimit">Telegram rate limit: %1$s. The task has stopped.</string>
-    <string name="NullgramIconDefault">Nullgram</string>
-    <string name="NullgramIconLight">Nullgram Light</string>
-    <string name="NullgramIconDark">Nullgram Dark</string>
+    <string name="NullgramIconDefault">Nullgram Blue (default)</string>
+    <string name="NullgramIconLight">Nullgram Mint</string>
+    <string name="NullgramIconDark">Nullgram Black</string>
     <string name="NullgramKeywordTitle">Keyword reminders</string>
     <string name="NullgramKeywordEnabled">Enable keyword reminders</string>
     <string name="NullgramKeywordAdd">Add keyword</string>
@@ -38,5 +38,5 @@
     <string name="NullgramSourceNotice">Nullgram is independently modified from Niagram (formerly NiagramX), revision bc99e5e9907a2ea47d9e6ed432469b8ff553644f. Modified 2026-11-01. It is not an official release of Niagram, NagramX, Nagram, Nekogram or Telegram. Copyright and third-party notices are preserved. Source is licensed under GPLv3; matching complete source and build instructions accompany the APK distribution. The application ID is retained for compatibility; the Nullgram display name identifies this independent fork; launcher artwork retains its original attribution, with optional independent Nullgram icons.</string>
     <string name="NullgramFontPreview">Nullgram is a Telegram client mod.</string>
     <string name="NullgramCompatibleParser">Compatibility parser</string>
-    <string name="NullgramNiagramIconDefault">NiagramX (default)</string>
+    <string name="NullgramNiagramIconDefault">NiagramX</string>
 </resources>

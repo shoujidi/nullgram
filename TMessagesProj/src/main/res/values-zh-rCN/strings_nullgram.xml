@@ -17,9 +17,9 @@
     <string name="NullgramRepeatTimeout">等待服务器确认超时，已停止，不会自动重试。</string>
     <string name="NullgramRepeatDenied">账号、连接状态或聊天权限发生变化，请检查慢速模式和 Telegram 限制。</string>
     <string name="NullgramRepeatRateLimit">Telegram 限速：%1$s。任务已停止。</string>
-    <string name="NullgramIconDefault">Nullgram</string>
-    <string name="NullgramIconLight">Nullgram 浅色</string>
-    <string name="NullgramIconDark">Nullgram 深色</string>
+    <string name="NullgramIconDefault">Nullgram 蓝青（默认）</string>
+    <string name="NullgramIconLight">Nullgram 薄荷</string>
+    <string name="NullgramIconDark">Nullgram 黑色</string>
     <string name="NullgramKeywordTitle">关键词提醒</string>
     <string name="NullgramKeywordEnabled">启用关键词提醒</string>
     <string name="NullgramKeywordAdd">添加关键词</string>
@@ -38,5 +38,5 @@
     <string name="NullgramSourceNotice">Nullgram 基于 Niagram（原 NiagramX）修改，基底提交 bc99e5e9907a2ea47d9e6ed432469b8ff553644f，修改日期 2026-11-01。不是 Niagram、NagramX、Nagram、Nekogram 或 Telegram 的官方版本，与其无隶属或背书关系。保留上游及第三方版权和许可，源码按 GPLv3 提供。分发 APK 时同时提供匹配的完整源码和构建说明。为兼容保留安装包名，Nullgram 显示名标识本 Fork；图标保留原作品归属，另提供独立 Nullgram 图标。</string>
     <string name="NullgramFontPreview">Nullgram 是基于 Telegram 的客户端。</string>
     <string name="NullgramCompatibleParser">兼容解析器</string>
-    <string name="NullgramNiagramIconDefault">NiagramX（默认）</string>
+    <string name="NullgramNiagramIconDefault">NiagramX</string>
 </resources>

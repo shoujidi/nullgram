@@ -10,20 +10,37 @@ import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
 
 public class LauncherIconController {
+    private static final LauncherIcon DEFAULT_ICON = LauncherIcon.NULLGRAM;
+
     public static void tryFixLauncherIconIfNeeded() {
+        Context context = ApplicationLoader.applicationContext;
+        // An explicit choice takes priority
+        // over the newly enabled manifest default after an application update.
+        for (LauncherIcon icon : LauncherIcon.values()) {
+            if (context.getPackageManager().getComponentEnabledSetting(icon.getComponentName(context))
+                    == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
+                for (LauncherIcon other : LauncherIcon.values()) {
+                    if (other != icon && isEnabled(other)) {
+                        setIcon(icon);
+                        break;
+                    }
+                }
+                return;
+            }
+        }
         for (LauncherIcon icon : LauncherIcon.values()) {
             if (isEnabled(icon)) {
                 return;
             }
         }
 
-        setIcon(LauncherIcon.DEFAULT);
+        setIcon(DEFAULT_ICON);
     }
 
     public static boolean isEnabled(LauncherIcon icon) {
         Context ctx = ApplicationLoader.applicationContext;
         int i = ctx.getPackageManager().getComponentEnabledSetting(icon.getComponentName(ctx));
-        return i == PackageManager.COMPONENT_ENABLED_STATE_ENABLED || i == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && icon == LauncherIcon.DEFAULT;
+        return i == PackageManager.COMPONENT_ENABLED_STATE_ENABLED || i == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && icon == DEFAULT_ICON;
     }
 
     public static LauncherIcon getCurrentIcon() {
@@ -32,7 +49,7 @@ public class LauncherIconController {
                 return icon;
             }
         }
-        return LauncherIcon.DEFAULT;
+        return DEFAULT_ICON;
     }
 
     public static void setIcon(LauncherIcon icon) {
@@ -71,8 +88,8 @@ public class LauncherIconController {
         TURBO("TurboIcon", R.drawable.icon_5_background_sa, R.mipmap.icon_5_foreground_sa, R.string.AppIconTurbo, true, R.mipmap.icon_5_launcher),
         NOX("NoxIcon", R.mipmap.icon_2_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconNox, true, R.mipmap.icon_2_launcher),
         NULLGRAM("NullgramIcon", R.drawable.nullgram_icon_background, R.drawable.nullgram_icon_foreground, R.string.NullgramIconDefault, R.mipmap.ic_launcher_nullgram),
-        LIGHT("NullgramLightIcon", R.drawable.nullgram_icon_light_background, R.drawable.nullgram_icon_foreground, R.string.NullgramIconLight, R.mipmap.ic_launcher_nullgram_light),
-        DARK("NullgramDarkIcon", R.drawable.nullgram_icon_dark_background, R.drawable.nullgram_icon_foreground, R.string.NullgramIconDark, R.mipmap.ic_launcher_nullgram_dark);
+        LIGHT("NullgramLightIcon", R.drawable.nullgram_icon_light_background, R.drawable.nullgram_icon_light_foreground, R.string.NullgramIconLight, R.mipmap.ic_launcher_nullgram_light),
+        DARK("NullgramDarkIcon", R.drawable.nullgram_icon_dark_background, R.drawable.nullgram_icon_dark_foreground, R.string.NullgramIconDark, R.mipmap.ic_launcher_nullgram_dark);
 
         public final String key;
         public final int background;

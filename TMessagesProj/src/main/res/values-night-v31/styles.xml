@@ -5,14 +5,15 @@
         <item name="android:windowNoTitle">true</item>
         <item name="android:actionBarStyle">@style/ActionBar.Transparent.TMessages.Start</item>
         <item name="android:colorBackground">#1f2732</item>
-        <item name="android:windowBackground">#1f2732</item>
+        <item name="android:windowBackground">@drawable/nullgram_splash_window</item>
         <item name="android:windowContentOverlay">@null</item>
         <item name="android:colorPrimaryDark">#1c242e</item>
         <item name="android:colorPrimary">#232d3a</item>
         <item name="android:navigationBarColor">#000000</item>
         <item name="android:forceDarkAllowed">false</item>
         <item name="android:windowSplashScreenAnimationDuration">@integer/splash_screen_duration</item>
-        <item name="android:windowSplashScreenBackground">@android:color/system_neutral1_900</item>
+        <item name="android:windowSplashScreenBackground">@color/nullgram_splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/nullgram_icon_foreground</item>
     </style>
     <style name="ActionBar.Transparent.TMessages.Start" parent="android:style/Widget.Material.Light.ActionBar">
         <item name="android:background">#ff232d3a</item>

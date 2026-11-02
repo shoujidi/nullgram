@@ -125,15 +125,35 @@ public class NullgramBrandingTest {
             }
         }
     }
-    @Test public void missingLauncherSelectionRepairsToOriginalNiagramDefault() {
+    @Test public void missingLauncherSelectionRepairsToBlueDefault() {
         android.content.Context context = ApplicationLoader.applicationContext;
         android.content.pm.PackageManager manager = context.getPackageManager();
         for (org.telegram.ui.LauncherIconController.LauncherIcon icon : org.telegram.ui.LauncherIconController.LauncherIcon.values()) {
             manager.setComponentEnabledSetting(icon.getComponentName(context), android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 1);
         }
         org.telegram.ui.LauncherIconController.tryFixLauncherIconIfNeeded();
-        assertEquals(org.telegram.ui.LauncherIconController.LauncherIcon.DEFAULT, org.telegram.ui.LauncherIconController.getCurrentIcon());
-        assertEquals(R.mipmap.icon_9_launcher, org.telegram.ui.LauncherIconController.LauncherIcon.DEFAULT.iconRes);
-        assertEquals("DefaultIcon", org.telegram.ui.LauncherIconController.LauncherIcon.DEFAULT.key);
+        assertEquals(org.telegram.ui.LauncherIconController.LauncherIcon.NULLGRAM, org.telegram.ui.LauncherIconController.getCurrentIcon());
+        assertEquals(R.mipmap.ic_launcher_nullgram, org.telegram.ui.LauncherIconController.LauncherIcon.NULLGRAM.iconRes);
+        assertEquals("NullgramIcon", org.telegram.ui.LauncherIconController.LauncherIcon.NULLGRAM.key);
+    }
+
+    @Test public void freshInstallHasExactlyOneBlueLauncherAndPreservesExplicitIconChoice() throws Exception {
+        android.content.Context context = ApplicationLoader.applicationContext;
+        android.content.pm.PackageManager manager = context.getPackageManager();
+        for (org.telegram.ui.LauncherIconController.LauncherIcon icon : org.telegram.ui.LauncherIconController.LauncherIcon.values()) {
+            manager.setComponentEnabledSetting(icon.getComponentName(context), android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT, 1);
+            boolean enabledInManifest = manager.getActivityInfo(icon.getComponentName(context), android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS).enabled;
+            assertEquals(icon == org.telegram.ui.LauncherIconController.LauncherIcon.NULLGRAM, enabledInManifest);
+            assertEquals(enabledInManifest, org.telegram.ui.LauncherIconController.isEnabled(icon));
+        }
+        assertEquals(org.telegram.ui.LauncherIconController.LauncherIcon.NULLGRAM, org.telegram.ui.LauncherIconController.getCurrentIcon());
+        assertEquals(R.mipmap.ic_launcher_nullgram, manager.getApplicationInfo(context.getPackageName(), 0).icon);
+        org.telegram.ui.LauncherIconController.LauncherIcon explicitChoice = org.telegram.ui.LauncherIconController.LauncherIcon.DARK;
+        manager.setComponentEnabledSetting(explicitChoice.getComponentName(context), android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 1);
+        org.telegram.ui.LauncherIconController.tryFixLauncherIconIfNeeded();
+        assertEquals(explicitChoice, org.telegram.ui.LauncherIconController.getCurrentIcon());
+        for (org.telegram.ui.LauncherIconController.LauncherIcon icon : org.telegram.ui.LauncherIconController.LauncherIcon.values()) {
+            assertEquals(icon == explicitChoice, org.telegram.ui.LauncherIconController.isEnabled(icon));
+        }
     }
 }

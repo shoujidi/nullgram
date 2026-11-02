@@ -904,6 +904,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         //    refreshRateController = new RefreshRateController(this);
         //}
         checkFrameMetrics();
+        com.nullgram.client.branding.NullgramSplash.attach(this, getIntent(), savedInstanceState);
     }
 
     public void checkFrameMetrics() {

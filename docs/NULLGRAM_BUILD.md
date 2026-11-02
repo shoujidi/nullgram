@@ -69,9 +69,10 @@ Installation and any account login are performed manually by the user.
 
 ## Icon collection
 
-NiagramX's original `icon_9_launcher` is the default. All 15 Niagram launcher options are restored,
-including their original selection behavior. Three independent Nullgram vector choices remain,
-for 18 total choices. Select an icon in **Settings → Chat Settings → App Icon**.
+Nullgram Blue (`NullgramIcon`) is the default. All 15 upstream launcher options remain available,
+including their original selection behavior. Three supplied Nullgram artwork variants (Blue, Mint, Black) are included,
+for 18 total public choices. Personal photo artwork is excluded from the public source and APK.
+The blue startup artwork exits when the first content layout is ready, with a maximum of 2 seconds. Select an icon in **Settings → Chat Settings → App Icon**.
 Upstream premium-only choices retain their original restrictions. No restricted Nagram-exclusive
 artwork is added. Application display name and installation package are unchanged.
 
