@@ -31,11 +31,18 @@ public final class KeywordNotificationPublisher implements KeywordReminderEngine
                 NotificationChannel channel = system.getNotificationChannel(CHANNEL);
                 if (channel == null) system.createNotificationChannel(new NotificationChannel(CHANNEL,
                         LocaleController.getString(R.string.NullgramKeywordTitle), NotificationManager.IMPORTANCE_HIGH));
-                else if (channel.getImportance() == NotificationManager.IMPORTANCE_NONE) return false;
+                else {
+                    // Update only the visible name; retain user-controlled sound, importance and ID.
+                    channel.setName(LocaleController.getString(R.string.NullgramKeywordTitle));
+                    system.createNotificationChannel(channel);
+                    if (channel.getImportance() == NotificationManager.IMPORTANCE_NONE) return false;
+                }
             }
             boolean locked = SharedConfig.appLocked || SharedConfig.isWaitingForPasscodeEnter;
             String title = locked ? LocaleController.getString(R.string.NullgramKeywordTitle) : message.title;
-            String text = locked ? LocaleController.getString(R.string.NullgramKeywordLocked) : message.text;
+            String text = locked ? LocaleController.getString(R.string.NullgramKeywordLocked)
+                    : message.online ? LocaleController.getString(R.string.NullgramReminderOnlineText)
+                    : message.text.isEmpty() ? LocaleController.getString(R.string.NullgramReminderMedia) : message.text;
             if (text.length() > 500) text = text.substring(0, 500);
             PendingIntent click = PendingIntent.getActivity(context, 0,
                     KeywordNotificationRouter.intent(context, account, userId, message.dialogId, message.id, message.topicId),

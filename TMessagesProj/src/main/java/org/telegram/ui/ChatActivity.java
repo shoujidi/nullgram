@@ -481,6 +481,7 @@ public class ChatActivity extends BaseFragment implements
     private final static int nkbtn_editPermission = 2020;
     private final static int nkbtn_copy_link_in_pm = 2025;
     private final static int nkbtn_repeatascopy = 2028;
+    private static final int nullgram_quick_repeat = 2098;
     private static final int nullgram_repeat_stop = 2099;
     private final static int nkbtn_setReminder = 2029;
     private final static int nkbtn_reply_private = 2033;
@@ -11184,6 +11185,7 @@ public class ChatActivity extends BaseFragment implements
         }
         if (canSendMessages) {
             actionModeOtherItem.addSubItem(nkbtn_repeatascopy, R.drawable.msg_repeat, LocaleController.getString(R.string.RepeatAsCopy));
+            actionModeOtherItem.addSubItem(nullgram_quick_repeat, R.drawable.msg_repeat, LocaleController.getString(R.string.NullgramRepeatQuick));
         }
         actionModeOtherItem.addSubItem(nkbtn_force_forward, R.drawable.msg_forward, LocaleController.getString(R.string.ForceForward));
         actionModeOtherItem.addSubItem(nkbtn_hide, R.drawable.msg_disable, LocaleController.getString(R.string.Hide));
@@ -20421,6 +20423,7 @@ public class ChatActivity extends BaseFragment implements
                 ActionBarMenuSubItem forwardNoQuoteItem = null;
                 ActionBarMenuSubItem repeatItem = null;
                 ActionBarMenuSubItem RepeatAsCopyItem = null;
+                ActionBarMenuSubItem quickRepeatItem = null;
                 ActionBarMenuSubItem forceForwardItem = null;
                 ActionBarMenuSubItem reportItem = null;
                 if (actionModeOtherItem != null) {
@@ -20428,6 +20431,7 @@ public class ChatActivity extends BaseFragment implements
                     forwardNoQuoteItem = actionModeOtherItem.getSubItem(nkbtn_forward_noquote);
                     repeatItem = actionModeOtherItem.getSubItem(nkbtn_repeat);
                     RepeatAsCopyItem = actionModeOtherItem.getSubItem(nkbtn_repeatascopy);
+                    quickRepeatItem = actionModeOtherItem.getSubItem(nullgram_quick_repeat);
                     forceForwardItem = actionModeOtherItem.getSubItem(nkbtn_force_forward);
                     reportItem = actionModeOtherItem.getSubItem(nkbtn_report);
                 }
@@ -20456,6 +20460,9 @@ public class ChatActivity extends BaseFragment implements
                 }
                 if (RepeatAsCopyItem != null) {
                     RepeatAsCopyItem.setVisibility(canSendMessage && (!noforwards || getMessageHelper().canSendMessagesAsCopy(getSelectedMessages1())));
+                }
+                if (quickRepeatItem != null) {
+                    quickRepeatItem.setVisibility(canSendMessage && (!noforwards || getMessageHelper().canSendMessagesAsCopy(getSelectedMessages1())));
                 }
                 if (forceForwardItem != null) {
                     boolean noQuoteForwardAvailable = canForward && NyaConfig.INSTANCE.getShowNoQuoteForward().Bool();
@@ -36588,6 +36595,10 @@ public class ChatActivity extends BaseFragment implements
                 repeatMessage(true, true);
                 return 2;
             }
+            case nullgram_quick_repeat: {
+                repeatMessage(true, true, true);
+                return 2;
+            }
             case nkbtn_force_forward: {
                 openForceForward(false);
                 return 2;
@@ -47063,6 +47074,9 @@ public class ChatActivity extends BaseFragment implements
         } else if (id == nkbtn_repeatascopy) {
             repeatMessage(false, true);
             clearSelectionMode();
+        } else if (id == nullgram_quick_repeat) {
+            repeatMessage(false, true, true);
+            clearSelectionMode();
         } else if (id == nkbtn_force_forward) {
             openForceForward(true);
             clearSelectionMode();
@@ -47128,6 +47142,10 @@ public class ChatActivity extends BaseFragment implements
             }
             case nkbtn_repeatascopy: {
                 repeatMessage(false, true);
+                break;
+            }
+            case nullgram_quick_repeat: {
+                repeatMessage(false, true, true);
                 break;
             }
             case nkbtn_force_forward: {
@@ -47381,6 +47399,10 @@ public class ChatActivity extends BaseFragment implements
     }
 
     private void repeatMessage(boolean isLongClick, boolean isRepeatasCopy) {
+        repeatMessage(isLongClick, isRepeatasCopy, false);
+    }
+
+    private void repeatMessage(boolean isLongClick, boolean isRepeatasCopy, boolean quick) {
         if (checkSlowMode(chatActivityEnterView.getSendButton())) {
             return;
         }
@@ -47390,6 +47412,10 @@ public class ChatActivity extends BaseFragment implements
             selectedObject = null;
         } else if (selectedObject != null) {
             messages.add(selectedObject);
+        }
+        if (quick) {
+            if (!messages.isEmpty()) doRepeatMessage(isLongClick, messages, true);
+            return;
         }
         if (!NyaConfig.repeatConfirm.Bool()) {
             showRepeatMessage(isLongClick, messages, isRepeatasCopy);
@@ -49705,6 +49731,9 @@ public class ChatActivity extends BaseFragment implements
                     if (chatMode != MODE_WELCOME_MESSAGES && (NyaConfig.INSTANCE.getShowRepeatAsCopy().Bool() || (NyaConfig.showRepeat.Bool() && noforwards)) && allowRepeat && !isAyuDeleted && !selectedObject.needDrawBluredPreview() && (!noforwards || getMessageHelper().canSendMessageAsCopy(selectedObject, selectedObjectGroup))){
                         items.add(LocaleController.getString(R.string.RepeatAsCopy));
                         options.add(nkbtn_repeatascopy);
+                        icons.add(R.drawable.msg_repeat);
+                        items.add(LocaleController.getString(R.string.NullgramRepeatQuick));
+                        options.add(nullgram_quick_repeat);
                         icons.add(R.drawable.msg_repeat);
                     }
                     if (chatMode != MODE_WELCOME_MESSAGES && !isAyuDeleted && !selectedObject.needDrawBluredPreview() && getMessageHelper().canSendMessageAsCopy(selectedObject, selectedObjectGroup)) {

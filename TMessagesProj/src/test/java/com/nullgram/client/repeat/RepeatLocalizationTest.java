@@ -48,6 +48,7 @@ public class RepeatLocalizationTest {
     @Test public void englishMenuAndDialogLabelsResolveWithUnits() {
         language(Locale.ENGLISH);
         assertEquals("Repeat send", LocaleController.getString(R.string.NullgramRepeatTitle));
+        assertEquals("Quick repeat", LocaleController.getString(R.string.NullgramRepeatQuick));
         assertEquals("Repetitions (times)", LocaleController.getString(R.string.NullgramRepeatCount));
         assertEquals("Interval (seconds)", LocaleController.getString(R.string.NullgramRepeatInterval));
         assertEquals("Start sending", LocaleController.getString(R.string.NullgramRepeatStart));
@@ -59,6 +60,7 @@ public class RepeatLocalizationTest {
     @Test public void chineseMenuDialogAndProgressResolve() {
         language(Locale.SIMPLIFIED_CHINESE);
         assertEquals("重复发送", LocaleController.getString(R.string.NullgramRepeatTitle));
+        assertEquals("快速复读", LocaleController.getString(R.string.NullgramRepeatQuick));
         assertEquals("重复次数（次）", LocaleController.getString(R.string.NullgramRepeatCount));
         assertEquals("发送间隔（秒）", LocaleController.getString(R.string.NullgramRepeatInterval));
         assertEquals("停止重复", LocaleController.getString(R.string.NullgramRepeatStop));

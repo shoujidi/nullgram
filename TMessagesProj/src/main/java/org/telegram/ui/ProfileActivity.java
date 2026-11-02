@@ -605,6 +605,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private ImageLocation uploadingImageLocation;
 
     private final static int add_contact = 1;
+    private final static int nullgram_watch_person = 2097;
     private final static int block_contact = 2;
     private final static int share_contact = 3;
     private final static int edit_contact = 4;
@@ -2634,6 +2635,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     onBlockContactClicked(false);
                 } else if (id == shadow_ban) {
                     onShadowBanClicked();
+                } else if (id == nullgram_watch_person) {
+                    com.nullgram.client.keyword.KeywordSettingsActivity reminders = new com.nullgram.client.keyword.KeywordSettingsActivity(userId);
+                    reminders.setCurrentAccount(currentAccount);
+                    presentFragment(reminders);
                 } else if (id == add_contact) {
                     TLRPC.User user = getMessagesController().getUser(userId);
                     Bundle args = new Bundle();
@@ -12691,6 +12696,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         otherItem.setSubItemShown(enable_no_forwards, forwardsAllowed);
                         otherItem.setSubItemShown(disable_no_forwards, !forwardsAllowed);
                     }
+                }
+                if (!isBot && !UserObject.isDeleted(user) && userId != getUserConfig().getClientUserId()) {
+                    otherItem.addSubItem(nullgram_watch_person, R.drawable.msg_info, getString(R.string.NullgramReminderAddPerson));
                 }
                 if (!isBot && getContactsController().contactsDict.get(userId) != null) {
                     otherItem.addSubItem(add_shortcut, R.drawable.msg_home, LocaleController.getString(R.string.AddShortcut));

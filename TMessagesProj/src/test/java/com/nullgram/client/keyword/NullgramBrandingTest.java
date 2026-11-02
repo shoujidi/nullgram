@@ -45,7 +45,10 @@ public class NullgramBrandingTest {
             assertTrue(LocaleController.getString(R.string.NullgramSourceNotice).contains("GPL"));
         }
         ReflectionHelpers.setField(controller, "currentLocale", Locale.SIMPLIFIED_CHINESE);
-        assertEquals("启用关键词提醒", LocaleController.getString(R.string.NullgramKeywordEnabled));
+        assertEquals("启用提醒", LocaleController.getString(R.string.NullgramKeywordEnabled));
+        assertEquals("提醒", LocaleController.getString(R.string.NullgramKeywordTitle));
+        assertEquals("添加特别关注人", LocaleController.getString(R.string.NullgramReminderAddPerson));
+        assertEquals("上线提醒", LocaleController.getString(R.string.NullgramReminderOnline));
         assertEquals("Null设置", LocaleController.getString(R.string.NekoSettings));
         assertEquals("Null设置", LocaleController.getString(R.string.N_Config));
     }
@@ -159,19 +162,19 @@ public class NullgramBrandingTest {
 
     @Test
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-    public void portraitIsOnlySmallLowQualityArtworkWithCopyrightNotice() throws Exception {
+    public void portraitIsHighResolutionArtworkWithCopyrightNotice() throws Exception {
         android.content.Context context = ApplicationLoader.applicationContext;
         android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
-        android.graphics.BitmapFactory.decodeResource(context.getResources(), R.drawable.nullgram_avatar_thumbnail, bounds);
-        assertEquals(96, bounds.outWidth);
-        assertEquals(96, bounds.outHeight);
-        assertEquals("image/jpeg", bounds.outMimeType);
-        try (InputStream input = context.getResources().openRawResource(R.drawable.nullgram_avatar_thumbnail)) {
+        android.graphics.BitmapFactory.decodeResource(context.getResources(), R.drawable.nullgram_exclusive_photo, bounds);
+        assertEquals(768, bounds.outWidth);
+        assertEquals(768, bounds.outHeight);
+        assertEquals("image/png", bounds.outMimeType);
+        try (InputStream input = context.getResources().openRawResource(R.drawable.nullgram_exclusive_photo)) {
             ByteArrayOutputStream data = new ByteArrayOutputStream();
             byte[] buffer = new byte[1024]; int count;
             while ((count = input.read(buffer)) != -1) data.write(buffer, 0, count);
-            assertTrue(data.size() < 4096);
+            assertTrue(data.size() > 4096);
         }
         try (InputStream input = context.getAssets().open("nullgram/AVATAR_COPYRIGHT.txt")) {
             ByteArrayOutputStream data = new ByteArrayOutputStream();
@@ -179,12 +182,12 @@ public class NullgramBrandingTest {
             while ((count = input.read(buffer)) != -1) data.write(buffer, 0, count);
             String notice = new String(data.toByteArray(), StandardCharsets.UTF_8);
             assertTrue(notice.contains("版权"));
-            assertTrue(notice.contains("96"));
+            assertTrue(notice.contains("768"));
         }
         for (Locale locale : new Locale[]{Locale.ENGLISH, Locale.SIMPLIFIED_CHINESE}) {
             ReflectionHelpers.setField(controller, "currentLocale", locale);
             String sourceNotice = LocaleController.getString(R.string.NullgramSourceNotice);
-            assertTrue(sourceNotice, sourceNotice.contains("96"));
+            assertTrue(sourceNotice, sourceNotice.contains("768"));
             assertFalse(LocaleController.getString(R.string.NullgramIconPhoto).startsWith("LOC_ERR"));
         }
     }

@@ -37,8 +37,8 @@ See the delivery report for the executed commands and PASS / FAIL / NOT RUN resu
 
 ## Use
 
-Open app settings → **Null设置 / Null Settings** → **关键词提醒 / Keyword reminders**.
-The first row is **启用关键词提醒**, initially off. Add keywords, then enable while the intended
+Open app settings → **Null设置 / Null Settings** → **提醒 / Reminders**.
+The first row is **启用提醒**, initially off. Add keywords, then enable while the intended
 logged-in account is selected. Only that account is monitored; selecting another account in the app
 does not silently rebind it. To rebind, turn off, select the intended account and enable again.
 
@@ -51,6 +51,8 @@ The feature consumes incoming live events from the existing Telegram connection.
 history and cannot receive messages while the original client itself cannot receive them. No additional
 service, network connection or keepalive framework is added. Android notification permission, channel
 settings and Do Not Disturb still apply. Notifications already displayed remain after disabling.
+
+The message menu also offers **Quick repeat**, which sends once using the original no-attribution path without a repeat configuration dialog.
 
 Long-press send to use repeat sending. The existing repeat settings, 0.01-second minimum interval,
 and unified stop control are retained. Server limits and network conditions still govern delivery.
@@ -71,8 +73,8 @@ Installation and any account login are performed manually by the user.
 
 Nullgram Blue (`NullgramIcon`) is the default. All 15 upstream launcher options remain available,
 including their original selection behavior. Three supplied Nullgram artwork variants (Blue, Mint, Black) are included,
-for 19 total choices including the optional portrait thumbnail.
-The portrait photograph is copyrighted by its provider. Only one 96x96 low-quality JPEG without EXIF is distributed; no original/high-resolution photograph or photo preview is published. See the in-app source notice and `TMessagesProj/src/main/assets/nullgram/AVATAR_COPYRIGHT.txt`.
+for 19 total choices including the optional portrait icon.
+The portrait photograph is copyrighted by its provider. This version restores the 768x768 portrait icon at the photograph provider’s request. The original photograph and production master are not published. No photo preview is included in README or release notes. See the in-app source notice and `TMessagesProj/src/main/assets/nullgram/AVATAR_COPYRIGHT.txt`.
 The blue startup artwork exits when the first content layout is ready, with a maximum of 2 seconds. Select an icon in **Settings → Chat Settings → App Icon**.
 Upstream premium-only choices retain their original restrictions. No restricted Nagram-exclusive
 artwork is added. Application display name and installation package are unchanged.
@@ -83,3 +85,5 @@ custom user titles are preserved. The current device row uses Nullgram, while ot
 keep their real server-provided names. Upstream attribution, channels, developer identities and
 Telegram service/product names remain truthful. New default save folders use Nullgram; existing
 custom folder preferences and existing files are not migrated or renamed.
+
+Watched-person message scopes, online alert limitations and migration are documented in [NULLGRAM_REMINDERS.md](NULLGRAM_REMINDERS.md).

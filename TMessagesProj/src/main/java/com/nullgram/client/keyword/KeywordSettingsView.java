@@ -15,11 +15,13 @@ import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Cells.TextSettingsCell;
 import org.telegram.ui.Components.EditTextBoldCursor;
 import java.util.List;
+import java.util.ArrayList;
 
 /** The first row is always the independent, default-off global switch. */
 public final class KeywordSettingsView extends LinearLayout {
     private final KeywordReminderController controller;
     private final int account;
+    private Runnable selectPerson;
     private final Theme.ResourcesProvider theme;
     public KeywordSettingsView(Context context, Theme.ResourcesProvider theme, KeywordReminderController controller, int account) {
         super(context);
@@ -27,6 +29,8 @@ public final class KeywordSettingsView extends LinearLayout {
         setOrientation(VERTICAL);
         refresh();
     }
+
+    public void setPersonPicker(Runnable picker) { selectPerson = picker; }
 
     public void refresh() {
         removeAllViews();
@@ -47,6 +51,15 @@ public final class KeywordSettingsView extends LinearLayout {
                 : LocaleController.formatString(R.string.NullgramKeywordAccount, engine.userId());
         info.setText(binding + "\n" + LocaleController.getString(R.string.NullgramKeywordInfo));
         addView(info);
+        TextCheckCell keywordToggle = new TextCheckCell(getContext(), theme);
+        keywordToggle.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite, theme));
+        keywordToggle.setTextAndCheck(LocaleController.getString(R.string.NullgramReminderKeywords), engine.keywordsEnabled(), true);
+        addView(keywordToggle);
+        keywordToggle.setOnClickListener(view -> {
+            try { engine.setKeywordsEnabled(!engine.keywordsEnabled()); }
+            catch (RuntimeException error) { showError(R.string.NullgramKeywordSaveFailed); }
+            refresh();
+        });
         TextSettingsCell add = row(LocaleController.getString(R.string.NullgramKeywordAdd));
         addView(add);
         add.setOnClickListener(view -> addKeyword());
@@ -63,6 +76,69 @@ public final class KeywordSettingsView extends LinearLayout {
                         save(values);
                     }).show());
         }
+        TextSettingsCell addPerson = row(LocaleController.getString(R.string.NullgramReminderAddPerson));
+        addView(addPerson);
+        addPerson.setOnClickListener(view -> { if (selectPerson != null) selectPerson.run(); });
+        long owner = controller.accountUserId(account);
+        for (WatchedPerson person : engine.watched(owner)) {
+            TextSettingsCell cell = row(person.name);
+            StringBuilder detail = new StringBuilder();
+            int[] bits = {WatchedPerson.PRIVATE, WatchedPerson.GROUP, WatchedPerson.CHANNEL};
+            int[] labels = {R.string.NullgramReminderPrivate, R.string.NullgramReminderGroup, R.string.NullgramReminderChannel};
+            for (int i = 0; i < bits.length; i++) if ((person.scopes & bits[i]) != 0) {
+                if (detail.length() > 0) detail.append(" · ");
+                detail.append(LocaleController.getString(labels[i]));
+            }
+            if (person.online) {
+                if (detail.length() > 0) detail.append(" · ");
+                detail.append(LocaleController.getString(R.string.NullgramReminderOnline));
+            }
+            cell.setTextAndValue(person.name, detail.toString(), true);
+            addView(cell);
+            cell.setOnClickListener(view -> editPerson(person));
+        }
+        TextInfoPrivacyCell watchInfo = new TextInfoPrivacyCell(getContext());
+        watchInfo.setText(LocaleController.getString(R.string.NullgramReminderWatchInfo));
+        addView(watchInfo);
+    }
+
+    public void editPerson(WatchedPerson person) {
+        boolean[] options = {(person.scopes & WatchedPerson.PRIVATE) != 0,
+                (person.scopes & WatchedPerson.GROUP) != 0, (person.scopes & WatchedPerson.CHANNEL) != 0, person.online};
+        int[] labels = {R.string.NullgramReminderPrivate, R.string.NullgramReminderGroup,
+                R.string.NullgramReminderChannel, R.string.NullgramReminderOnline};
+        LinearLayout content = new LinearLayout(getContext());
+        content.setOrientation(VERTICAL);
+        for (int i = 0; i < options.length; i++) {
+            final int index = i;
+            TextCheckCell check = new TextCheckCell(getContext(), theme);
+            check.setTextAndCheck(LocaleController.getString(labels[i]), options[i], i < options.length - 1);
+            check.setOnClickListener(view -> { options[index] = !options[index]; check.setChecked(options[index]); });
+            content.addView(check);
+        }
+        AlertDialog dialog = new AlertDialog.Builder(getContext(), theme).setTitle(person.name + " · " + person.id)
+                .setView(content).setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                .setNeutralButton(LocaleController.getString(R.string.Delete), (d, which) -> savePerson(person, null))
+                .setPositiveButton(LocaleController.getString(R.string.Save), null).create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            int scopes = (options[0] ? WatchedPerson.PRIVATE : 0) | (options[1] ? WatchedPerson.GROUP : 0)
+                    | (options[2] ? WatchedPerson.CHANNEL : 0);
+            if (savePerson(person, new WatchedPerson(person.id, person.name, scopes, options[3]))) dialog.dismiss();
+        }));
+        dialog.show();
+    }
+
+    private boolean savePerson(WatchedPerson previous, WatchedPerson replacement) {
+        try {
+            long owner = controller.accountUserId(account);
+            List<WatchedPerson> values = new ArrayList<>(controller.engine().watched(owner));
+            values.removeIf(person -> person.id == previous.id);
+            if (replacement != null) values.add(replacement);
+            controller.engine().setWatched(owner, values);
+            refresh(); return true;
+        } catch (IllegalArgumentException error) { showError(R.string.NullgramReminderPersonLimit); }
+        catch (RuntimeException error) { showError(R.string.NullgramKeywordSaveFailed); }
+        return false;
     }
 
     private void addKeyword() {

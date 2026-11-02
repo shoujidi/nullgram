@@ -1,3 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright belongs to the user who supplied the photograph. Only a 96x96 low-quality JPEG is distributed. -->
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android" android:src="@drawable/nullgram_avatar_thumbnail" android:gravity="fill" android:filter="true" />
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/nullgram_exclusive_photo"
+    android:gravity="fill" android:filter="true" />

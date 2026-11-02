@@ -15,17 +15,26 @@ import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import java.util.List;
 
-/** Owns only its own two observers, for exactly one selected account. UI thread only. */
+/** Owns only its own four observers, for exactly one selected account. UI thread only. */
 public final class KeywordReminderController implements NotificationCenter.NotificationCenterDelegate {
     public interface Accounts extends KeywordReminderEngine.Accounts {
         long userId(int account);
         String title(int account, long dialogId, MessageObject message);
+        default long presence(int account, long userId) { return 0; }
+        default String personName(int account, long userId) { return Long.toString(userId); }
+        default boolean connected(int account) { return true; }
+        default int scope(int account, MessageObject message) {
+            if (message.getDialogId() > 0 || org.telegram.messenger.DialogObject.isEncryptedDialog(message.getDialogId())) return WatchedPerson.PRIVATE;
+            return message.messageOwner.peer_id instanceof TLRPC.TL_peerChat
+                    ? WatchedPerson.GROUP : WatchedPerson.CHANNEL;
+        }
         default long topicId(int account, MessageObject message) { return 0; }
     }
     private static KeywordReminderController instance;
     private final KeywordReminderEngine engine;
     private final Accounts accounts;
     private int observedAccount = -1;
+    private boolean presenceConnected;
 
     public static KeywordReminderController get() {
         if (instance == null) {
@@ -60,12 +69,17 @@ public final class KeywordReminderController implements NotificationCenter.Notif
                 NotificationCenter center = NotificationCenter.getInstance(account);
                 center.addObserver(KeywordReminderController.this, NotificationCenter.didReceiveNewMessages);
                 center.addObserver(KeywordReminderController.this, NotificationCenter.appDidLogout);
+                center.addObserver(KeywordReminderController.this, NotificationCenter.updateInterfaces);
+                center.addObserver(KeywordReminderController.this, NotificationCenter.didUpdateConnectionState);
                 observedAccount = account;
+                presenceConnected = accounts.connected(account);
             }
             public void unregister(int account) {
                 NotificationCenter center = NotificationCenter.getInstance(account);
                 center.removeObserver(KeywordReminderController.this, NotificationCenter.didReceiveNewMessages);
                 center.removeObserver(KeywordReminderController.this, NotificationCenter.appDidLogout);
+                center.removeObserver(KeywordReminderController.this, NotificationCenter.updateInterfaces);
+                center.removeObserver(KeywordReminderController.this, NotificationCenter.didUpdateConnectionState);
                 observedAccount = -1;
             }
         }, tasks, publisher, matcher);
@@ -73,11 +87,27 @@ public final class KeywordReminderController implements NotificationCenter.Notif
 
     public KeywordReminderEngine engine() { return engine; }
     public boolean enableForAccount(int account) { return engine.enable(account, accounts.userId(account)); }
+    public long accountUserId(int account) { return accounts.userId(account); }
+    private void refreshPresence(int account) {
+        for (WatchedPerson person : engine.activeWatched()) if (person.online)
+            engine.onStatus(account, person.id, accounts.presence(account, person.id), accounts.personName(account, person.id));
+    }
 
     @Override public void didReceivedNotification(int id, int account, Object... args) {
         if (!engine.isEnabled() || account != engine.account()) return;
         try {
             if (id == NotificationCenter.appDidLogout) { engine.disable(); return; }
+            if (id == NotificationCenter.didUpdateConnectionState) {
+                boolean connected = accounts.connected(account);
+                if (!connected || !presenceConnected) engine.resetPresence();
+                presenceConnected = connected;
+                return;
+            }
+            if (id == NotificationCenter.updateInterfaces) {
+                if (presenceConnected && args.length > 0 && args[0] instanceof Integer
+                        && (((Integer) args[0]) & MessagesController.UPDATE_MASK_STATUS) != 0) refreshPresence(account);
+                return;
+            }
             if (id != NotificationCenter.didReceiveNewMessages || args.length < 2 || !(args[1] instanceof List)) return;
             if (args.length > 2 && Boolean.TRUE.equals(args[2])) return;
             if (args.length > 3 && args[3] instanceof Number && ((Number) args[3]).intValue() != 0) return;
@@ -90,7 +120,8 @@ public final class KeywordReminderController implements NotificationCenter.Notif
                 long dialogId = message.getDialogId();
                 // No mute/archive lookup: those are exclusively the original notification system's rules.
                 engine.onMessage(account, new KeywordReminderEngine.Message(dialogId, owner.id, owner.date,
-                        accounts.title(account, dialogId, message), owner.message, accounts.topicId(account, message)));
+                        accounts.title(account, dialogId, message), owner.message, accounts.topicId(account, message),
+                        owner.from_id == null ? 0 : owner.from_id.user_id, accounts.scope(account, message), false));
             }
         } catch (RuntimeException error) {
             // A keyword-module failure must never interrupt delivery to Telegram's other observers.
@@ -100,6 +131,10 @@ public final class KeywordReminderController implements NotificationCenter.Notif
     }
 
     private static final class NativeAccounts implements Accounts {
+        public int scope(int account, MessageObject message) {
+            if (message.getDialogId() > 0 || org.telegram.messenger.DialogObject.isEncryptedDialog(message.getDialogId())) return WatchedPerson.PRIVATE;
+            return message.messageOwner.peer_id instanceof TLRPC.TL_peerChat || message.isSupergroup() ? WatchedPerson.GROUP : WatchedPerson.CHANNEL;
+        }
         public long topicId(int account, MessageObject message) {
             return MessageObject.getTopicId(account, message.messageOwner, MessagesController.getInstance(account).isForum(message));
         }
@@ -109,6 +144,20 @@ public final class KeywordReminderController implements NotificationCenter.Notif
         public boolean valid(int account, long userId) {
             return userId != 0 && account >= 0 && account < UserConfig.MAX_ACCOUNT_COUNT
                     && UserConfig.getInstance(account).isClientActivated() && userId(account) == userId;
+        }
+        public long presence(int account, long userId) {
+            TLRPC.User user = MessagesController.getInstance(account).getUser(userId);
+            if (user == null || user.bot || user.deleted || user.status == null) return 0;
+            if (user.status instanceof TLRPC.TL_userStatusOnline) return user.status.expires;
+            if (user.status instanceof TLRPC.TL_userStatusOffline) return -1;
+            return 0; // recently/last week/hidden is unknown, not evidence of going offline.
+        }
+        public String personName(int account, long userId) {
+            TLRPC.User user = MessagesController.getInstance(account).getUser(userId);
+            return user == null ? Long.toString(userId) : UserObject.getUserName(user);
+        }
+        public boolean connected(int account) {
+            return ConnectionsManager.getInstance(account).getConnectionState() == ConnectionsManager.ConnectionStateConnected;
         }
         public long nowSeconds(int account) { return ConnectionsManager.getInstance(account).getCurrentTime(); }
         public String title(int account, long dialogId, MessageObject message) {
@@ -120,7 +169,7 @@ public final class KeywordReminderController implements NotificationCenter.Notif
                 TLRPC.User user = messages.getUser(dialogId);
                 if (user != null) return UserObject.getUserName(user);
             }
-            return "Nullgram · " + dialogId;
+            return "Nullgram 路 " + dialogId;
         }
     }
 }

@@ -7,14 +7,25 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Collections;
 
 public final class KeywordReminderEngine {
     public static final int MAX_KEYWORDS = 100;
     public static final int MAX_KEYWORD_LENGTH = 128;
     public static final int MAX_SEEN = 512;
+    public static final int MAX_WATCHED = 100;
+    public static final int ONLINE_COOLDOWN_SECONDS = 60;
 
     public interface Store {
         boolean enabled();
+        default boolean keywordsEnabled() { return true; }
+        default void keywordsEnabled(boolean value) { }
+        default List<WatchedPerson> watched(long owner) { return Collections.emptyList(); }
+        default void watched(long owner, List<WatchedPerson> values) { }
+        default Map<Long, Long> onlineAlerts(long owner) { return Collections.emptyMap(); }
+        default void onlineAlerts(long owner, Map<Long, Long> values) { }
         int account();
         long userId();
         long since();
@@ -39,14 +50,22 @@ public final class KeywordReminderEngine {
         public final int id;
         public final long date;
         public final String title, text;
+        public final long senderId;
+        public final int scope;
+        public final boolean online;
         public Message(long dialogId, int id, long date, String title, String text) {
             this(dialogId, id, date, title, text, 0);
         }
         public Message(long dialogId, int id, long date, String title, String text, long topicId) {
-            this.dialogId = dialogId; this.id = id; this.date = date;
-            this.title = title; this.text = text; this.topicId = topicId;
+            this(dialogId, id, date, title, text, topicId, 0, 0, false);
         }
-        public String key() { return dialogId + ":" + id; }
+        public Message(long dialogId, int id, long date, String title, String text, long topicId,
+                       long senderId, int scope, boolean online) {
+            this.dialogId = dialogId; this.id = id; this.date = date;
+            this.title = title; this.text = text == null ? "" : text; this.topicId = topicId;
+            this.senderId = senderId; this.scope = scope; this.online = online;
+        }
+        public String key() { return online ? "online:" + senderId + ":" + date : dialogId + ":" + id; }
     }
 
     private final Store store;
@@ -59,7 +78,13 @@ public final class KeywordReminderEngine {
     private final Set<String> pendingKeys = new HashSet<>();
     private LinkedHashSet<String> seen = new LinkedHashSet<>();
     private List<String> keywords;
-    private boolean enabled;
+    private boolean enabled, keywordsEnabled;
+    private List<WatchedPerson> watched = new ArrayList<>();
+    private final Map<Long, Long> statusBaseline = new HashMap<>();
+    private Map<Long, Long> lastOnline = new HashMap<>();
+    private final Set<Long> pendingOnline = new HashSet<>();
+    private final Set<Runnable> presenceTasks = new HashSet<>();
+    private long presenceVersion;
     private int account = -1;
     private long userId, since, version;
 
@@ -67,6 +92,7 @@ public final class KeywordReminderEngine {
         this.store = store; this.accounts = accounts; this.events = events;
         this.tasks = tasks; this.publisher = publisher; this.matcher = matcher;
         keywords = new ArrayList<>(store.keywords());
+        keywordsEnabled = store.keywordsEnabled();
     }
 
     public boolean isEnabled() { return enabled; }
@@ -74,6 +100,49 @@ public final class KeywordReminderEngine {
     public long userId() { return userId; }
     public List<String> keywords() { return new ArrayList<>(keywords); }
     public int pendingCount() { return pending.size(); }
+    public boolean keywordsEnabled() { return keywordsEnabled; }
+    public List<WatchedPerson> watched(long owner) { return new ArrayList<>(store.watched(owner)); }
+    public List<WatchedPerson> activeWatched() { return new ArrayList<>(watched); }
+    public void setKeywordsEnabled(boolean value) {
+        store.keywordsEnabled(value); keywordsEnabled = value; invalidateTasks();
+    }
+    public void setWatched(long owner, List<WatchedPerson> values) {
+        if (owner <= 0 || values.size() > MAX_WATCHED) throw new IllegalArgumentException("WATCHED_LIMIT");
+        Set<Long> ids = new HashSet<>();
+        for (WatchedPerson person : values) if (person == null || person.id == owner || !ids.add(person.id))
+            throw new IllegalArgumentException("WATCHED_PERSON");
+        store.watched(owner, values);
+        if (owner == userId) {
+            watched = new ArrayList<>(values); statusBaseline.clear(); invalidateTasks();
+            lastOnline.keySet().retainAll(ids);
+        }
+    }
+    private void invalidateTasks() { version++; cancelPending(); }
+    public void resetPresence() {
+        if (!enabled) return;
+        statusBaseline.clear(); presenceVersion++;
+        for (Runnable action : new ArrayList<>(presenceTasks)) { tasks.cancel(action); pending.remove(action); }
+        presenceTasks.clear(); pendingOnline.clear();
+        pendingKeys.removeIf(key -> key.startsWith("online:"));
+    }
+
+    /** 0 = unavailable, -1 = visible offline, positive = online expiration (server seconds).
+     * Initial/reconnect observations are baselines, never notifications. No polling or timers. */
+    public void onStatus(int sourceAccount, long personId, long expires, String name) {
+        if (!enabled || sourceAccount != account) return;
+        if (!accounts.valid(account, userId)) { disable(); return; }
+        WatchedPerson person = null;
+        for (WatchedPerson candidate : watched) if (candidate.id == personId && candidate.online) { person = candidate; break; }
+        if (person == null) return;
+        if (expires == 0) { statusBaseline.remove(personId); return; }
+        Long previous = statusBaseline.put(personId, expires);
+        long now = accounts.nowSeconds(account);
+        if (previous == null || previous > now || expires <= now || pendingOnline.contains(personId)) return;
+        long last = lastOnline.getOrDefault(personId, 0L);
+        if (last != 0 && now - last < ONLINE_COOLDOWN_SECONDS) return;
+        pendingOnline.add(personId);
+        enqueue(new Message(personId, 0, expires, name == null ? person.name : name, "", 0, personId, 0, true));
+    }
 
     public void restore() {
         if (!store.enabled()) return;
@@ -98,6 +167,11 @@ public final class KeywordReminderEngine {
         stopRuntime();
         account = selectedAccount; userId = selectedUserId; since = start;
         seen = new LinkedHashSet<>(store.seen(userId));
+        watched = new ArrayList<>(store.watched(userId));
+        lastOnline = new HashMap<>(store.onlineAlerts(userId));
+        Set<Long> ids = new HashSet<>();
+        for (WatchedPerson person : watched) ids.add(person.id);
+        lastOnline.keySet().retainAll(ids);
         enabled = true;
         events.register(account);
     }
@@ -117,12 +191,17 @@ public final class KeywordReminderEngine {
         if (wasEnabled) events.unregister(account);
         cancelPending();
         seen.clear();
+        statusBaseline.clear();
+        watched.clear();
+        lastOnline.clear();
     }
 
     private void cancelPending() {
         for (Runnable action : new ArrayList<>(pending)) tasks.cancel(action);
         pending.clear();
         pendingKeys.clear();
+        pendingOnline.clear();
+        presenceTasks.clear();
     }
 
     public void setKeywords(List<String> values) {
@@ -145,17 +224,32 @@ public final class KeywordReminderEngine {
         if (!enabled) return;
         if (sourceAccount != account || message == null || message.id == 0 || message.dialogId == 0) return;
         if (!accounts.valid(account, userId)) { disable(); return; }
-        if (message.date < since || keywords.isEmpty() || message.text == null || message.text.isEmpty()) return;
-        if (!matcher.matches(message.text, keywords)) return;
+        if (message.online || message.senderId == userId || message.date < since) return;
+        boolean watchedMatch = false;
+        for (WatchedPerson person : watched) {
+            if (person.id == message.senderId && (person.scopes & message.scope) != 0) { watchedMatch = true; break; }
+        }
+        if (!watchedMatch && (!keywordsEnabled || keywords.isEmpty() || message.text.isEmpty()
+                || !matcher.matches(message.text, keywords))) return;
+        enqueue(message);
+    }
+
+    private void enqueue(Message message) {
         String key = message.key();
-        if (seen.contains(key) || !pendingKeys.add(key)) return;
+        if (seen.contains(key) || !pendingKeys.add(key)) {
+            if (message.online) pendingOnline.remove(message.senderId);
+            return;
+        }
         long token = version;
+        long presenceToken = presenceVersion;
         Runnable action = new Runnable() {
             @Override public void run() {
                 // A cancelled callback may already have been dequeued. Never remove a new epoch's key.
-                if (!enabled || token != version) return;
+                if (!enabled || token != version || (message.online && presenceToken != presenceVersion)) return;
                 pending.remove(this);
+                presenceTasks.remove(this);
                 pendingKeys.remove(key);
+                if (message.online) pendingOnline.remove(message.senderId);
                 if (!accounts.valid(account, userId)) { disable(); return; }
                 if (seen.contains(key)) return;
                 try {
@@ -163,6 +257,10 @@ public final class KeywordReminderEngine {
                         seen.add(key);
                         while (seen.size() > MAX_SEEN) seen.remove(seen.iterator().next());
                         store.remember(userId, seen);
+                        if (message.online) {
+                            lastOnline.put(message.senderId, accounts.nowSeconds(account));
+                            store.onlineAlerts(userId, lastOnline);
+                        }
                     }
                 } catch (RuntimeException failure) {
                     stopRuntime();
@@ -171,6 +269,7 @@ public final class KeywordReminderEngine {
             }
         };
         pending.add(action);
+        if (message.online) presenceTasks.add(action);
         tasks.post(action);
     }
 
