@@ -1,0 +1,95 @@
+{
+  "reference": "QQ Android 9.2.15 (11480)",
+  "source": "User-provided local APK exported from their device",
+  "ownership": "QQ artwork belongs to its original copyright holders; no authorship claim by Nullgram.",
+  "scope": "List chrome and main navigation only; other page bodies remain native.",
+  "evidence": {
+    "rowHeightDp": 72,
+    "avatarDp": 58,
+    "titleSp": 17,
+    "navigationHeightDp": 54,
+    "normalIconColor": "#1A1A1A",
+    "selectedIconColor": "#0099FF"
+  },
+  "mapping": [
+    {
+      "telegram": "messages",
+      "qq": "message"
+    },
+    {
+      "telegram": "contacts",
+      "qq": "contact"
+    },
+    {
+      "telegram": "calls",
+      "qq": "activity"
+    },
+    {
+      "telegram": "profile",
+      "qq": "me"
+    }
+  ],
+  "runtimeVerification": "NOT RUN; server-selected tab variants/order and animation timing cannot be confirmed from these static resources.",
+  "resources": [
+    {
+      "resource": "nullgram_qq_tab_message_normal.png",
+      "apk_path": "r/b/qui_nav_btm_message_default.png",
+      "density": "xxhdpi",
+      "sha256": "4b781569ef26a5a419a236796db0eb40b997350c74aa8123728dc4c3371dc7cb"
+    },
+    {
+      "resource": "nullgram_qq_tab_message_selected.png",
+      "apk_path": "r/b/qui_nav_btm_message_default_pressed.png",
+      "density": "xxhdpi",
+      "sha256": "bd2d305dbfa3f0f589abf2b07de310d2cccec4a084c990a29bdf0558168098de"
+    },
+    {
+      "resource": "nullgram_qq_tab_contacts_normal.png",
+      "apk_path": "r/b/qui_nav_btm_contact_default.png",
+      "density": "xxhdpi",
+      "sha256": "43a65353e1de00a0f05acd0d3936c0ba189488edbf3ad4a59f91afd2b46784cb"
+    },
+    {
+      "resource": "nullgram_qq_tab_contacts_selected.png",
+      "apk_path": "r/b/qui_nav_btm_contact_default_pressed.png",
+      "density": "xxhdpi",
+      "sha256": "fdfa7326f69e5ad30d5b99f73a1a83ac25cd304ad61d6a951d2437518f3713f0"
+    },
+    {
+      "resource": "nullgram_qq_tab_calls_normal.png",
+      "apk_path": "r/b/qui_nav_btm_activity_default.png",
+      "density": "xxhdpi",
+      "sha256": "49f878b41ea34487520f587322e2f9f81b8c2af7d177e592503697c5988c4648"
+    },
+    {
+      "resource": "nullgram_qq_tab_calls_selected.png",
+      "apk_path": "r/b/qui_nav_btm_activity_default_pressed.png",
+      "density": "xxhdpi",
+      "sha256": "cb950d8d67d494a030ae6b68ea9a8c7ddbe508ef430c5ab8e49ad48fa243688a"
+    },
+    {
+      "resource": "nullgram_qq_tab_me_normal.png",
+      "apk_path": "r/b/qui_nav_btm_me_default.png",
+      "density": "xxhdpi",
+      "sha256": "c9a0d2a52d6e34a5836af9e50f4c7469555eefbc30a819eb0c2c4014bc1c218d"
+    },
+    {
+      "resource": "nullgram_qq_tab_me_selected.png",
+      "apk_path": "r/b/qui_nav_btm_me_default_pressed.png",
+      "density": "xxhdpi",
+      "sha256": "0fee844f22c9cbc8432004f131e3b5abf04b318ef01a705458f77fbf1e8dc358"
+    },
+    {
+      "resource": "nullgram_qq_add.png",
+      "apk_path": "r/b/qui_add.png",
+      "density": "xxhdpi",
+      "sha256": "5a1bd94e199e137d5d70d81b42a26318bfd914d5fecc43b99fd3e1b8bb82a3d5"
+    },
+    {
+      "resource": "nullgram_qq_search.png",
+      "apk_path": "r/b/qui_search.png",
+      "density": "xxhdpi",
+      "sha256": "ed147367817ec6f90162bb67cadced79e276f2eea43bd4c164a4eb524939bed6"
+    }
+  ]
+}

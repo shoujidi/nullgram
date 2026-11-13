@@ -13,8 +13,8 @@ import android.widget.LinearLayout;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-import com.radolyn.ayugram.messages.AyuSavePreferences;
-import com.radolyn.ayugram.utils.AyuGhostPreferences;
+import top.nkbe.niagram.ayu.messages.AyuSavePreferences;
+import top.nkbe.niagram.ayu.utils.AyuGhostPreferences;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -89,7 +89,7 @@ public final class SettingsBackupHelper {
             spToJSON("nekox_config", configJson, null);
             spToJSON("nekocloud", configJson, null);
         }
-        spToJSON("nkmrcfg", configJson, null, includeApiKeys);
+        spToJSON("nkmrcfg", configJson, key -> !isCloud || !LocalNameHelper.isAliasKey(key), includeApiKeys);
 
         return configJson.toString(indentSpaces);
     }
@@ -158,6 +158,11 @@ public final class SettingsBackupHelper {
 
     @SuppressLint("ApplySharedPref")
     public static void importSettings(JsonObject configJson) throws JSONException {
+        importSettings(configJson, false);
+    }
+
+    @SuppressLint("ApplySharedPref")
+    public static void importSettings(JsonObject configJson, boolean isCloud) throws JSONException {
         Map<String, Integer> configTypes = new HashMap<>();
         try {
             configTypes.putAll(NyaConfig.INSTANCE.getConfigTypes());
@@ -181,6 +186,9 @@ public final class SettingsBackupHelper {
             SharedPreferences.Editor editor = preferences.edit();
             for (Map.Entry<String, JsonElement> config : ((JsonObject) element.getValue()).entrySet()) {
                 String key = config.getKey();
+                if (isCloud && LocalNameHelper.isAliasKey(key)) {
+                    continue;
+                }
                 if ("nkmrcfg".equals(spName) && isDeviceSpecificPushKey(key)) {
                     continue;
                 }

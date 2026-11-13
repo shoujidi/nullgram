@@ -8,6 +8,9 @@
 
 package org.telegram.ui;
 
+import com.nullgram.client.appearance.DisguiseListTheme;
+import com.nullgram.client.appearance.QqListHeader;
+
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.AndroidUtilities.dpf2;
 import static org.telegram.messenger.AndroidUtilities.lerp;
@@ -97,7 +100,7 @@ import org.telegram.ui.recyclerview.LinearSmoothScrollerCustom;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.ViewPager;
 
-import com.radolyn.ayugram.utils.LastSeenHelper;
+import top.nkbe.niagram.ayu.utils.LastSeenHelper;
 
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
@@ -950,6 +953,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
         @Override
         public void drawBlurRect(Canvas canvas, float y, Rect rectTmp, Paint blurScrimPaint, boolean top) {
+            if (usesQqListTheme() && getRightSlidingProgress() == 0) {
+                int color = blurScrimPaint.getColor();
+                blurScrimPaint.setColor(DisguiseListTheme.WHITE);
+                canvas.drawRect(rectTmp, blurScrimPaint);
+                blurScrimPaint.setColor(color);
+                return;
+            }
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || !SharedConfig.chatBlurEnabled() || iBlur3SourceGlassFrosted == null || !BlurredBackgroundProviderImpl.checkBlurEnabled(currentAccount, resourceProvider)) {
                 canvas.drawRect(rectTmp, blurScrimPaint);
                 return;
@@ -3024,8 +3034,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         BirthdayController.getInstance(currentAccount).check();
-        additionNavigationBarHeight = hasMainTabs && !NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool() ? dp(MainTabsHelper.getMainTabsHeightWithMargins()) : 0;
-        additionFloatingButtonOffset = hasMainTabs && !NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool() ? dp(MainTabsHelper.getMainTabsHeight() + MainTabsHelper.getMainTabsMargin()) : 0;
+        additionNavigationBarHeight = hasMainTabs && !MainTabsHelper.isBottomNavigationHidden() ? dp(MainTabsHelper.getMainTabsHeightWithMargins()) : 0;
+        additionFloatingButtonOffset = hasMainTabs && !MainTabsHelper.isBottomNavigationHidden() ? dp(MainTabsHelper.getMainTabsHeight() + MainTabsHelper.getMainTabsMargin()) : 0;
 
         LastSeenHelper.preload();
 
@@ -3055,6 +3065,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     @SuppressLint("UseCompatLoadingForDrawables")
     public void updateStatus(TLRPC.User user, boolean animated) {
+        if (qqListHeader != null) {
+            qqListHeader.bind(currentAccount);
+            qqListHeader.setStatusDrawable(statusDrawable, NyaConfig.isGhostModeActive() && NyaConfig.showGhostModeStatus.Bool() ? null : this::showSelectStatusDialog);
+        }
         if (dialogStoriesCell != null) {
             dialogStoriesCell.updateStatus(user, animated);
         }
@@ -3182,7 +3196,40 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public ActionBar createActionBar(Context context) {
+        resourceProvider = DisguiseListTheme.wrap(resourceProvider, usesQqListTheme());
         ActionBar actionBar = new ActionBar(context, resourceProvider) {
+            @Override
+            protected void dispatchDraw(Canvas canvas) {
+                if (qqListHeader != null) {
+                    boolean show = showQqListHeader();
+                    qqListHeader.setVisibility(show ? View.VISIBLE : View.GONE);
+                    if (getTitlesContainer() != null) getTitlesContainer().setImportantForAccessibility(
+                            show ? View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS : View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+                    if (getBackButton() != null) getBackButton().setImportantForAccessibility(
+                            show ? View.IMPORTANT_FOR_ACCESSIBILITY_NO : View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+                }
+                super.dispatchDraw(canvas);
+            }
+
+            @Override
+            protected void onMeasure(int width, int height) {
+                if (qqListHeader != null) setExtraHeight(Math.max(0,
+                        dp(com.nullgram.client.appearance.QqListStyle.headerHeight(context)) - ActionBar.getCurrentActionBarHeight()));
+                super.onMeasure(width, height);
+                if (qqListHeader != null) qqListHeader.measure(
+                        View.MeasureSpec.makeMeasureSpec(Math.max(0, getMeasuredWidth() - createMenu().getMeasuredWidth()), View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(Math.max(ActionBar.getCurrentActionBarHeight(), dp(com.nullgram.client.appearance.QqListStyle.headerHeight(context))), View.MeasureSpec.EXACTLY));
+            }
+
+            @Override
+            protected void onLayout(boolean changed, int l, int t, int r, int b) {
+                super.onLayout(changed, l, t, r, b);
+                if (qqListHeader != null) {
+                    int top = getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0;
+                    qqListHeader.layout(0, top, qqListHeader.getMeasuredWidth(), top + qqListHeader.getMeasuredHeight());
+                }
+            }
+
 
             @Override
             public void setTranslationY(float translationY) {
@@ -3199,6 +3246,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
             @Override
             protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
+                if (qqListHeader != null && showQqListHeader() &&
+                        (child == getTitlesContainer() || child == getBackButton() || child == getAdditionalSubTitleOverlayContainer())) return false;
                 if (inPreviewMode && avatarContainer != null && child != avatarContainer) {
                     return false;
                 }
@@ -3279,10 +3328,23 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
     }
 
+    private QqListHeader qqListHeader;
+
+    public boolean usesQqListTheme() {
+        return DisguiseListTheme.isQq() && DisguiseListTheme.appliesTo(
+                onlySelect, folderId, communityId, isMainDialogList(), inPreviewMode);
+    }
+
+    private boolean showQqListHeader() {
+        return usesQqListTheme() && !searching && !animatorSearchVisible.getValue()
+                && !actionBar.isActionModeShowed() && getRightSlidingProgress() == 0;
+    }
+
     private CharSequence actionBarTitleNax;
 
     @Override
     public View createView(final Context context) {
+        qqListHeader = null;
         searching = false;
         searchWas = false;
         wasDrawn = false;
@@ -3290,8 +3352,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         filterTabsView = null;
         selectedDialogs.clear();
 
-        additionNavigationBarHeight = hasMainTabs && !NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool() ? dp(MainTabsHelper.getMainTabsHeightWithMargins()) : 0;
-        additionFloatingButtonOffset = hasMainTabs && !NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool() ? dp(MainTabsHelper.getMainTabsHeight() + MainTabsHelper.getMainTabsMargin()) : 0;
+        additionNavigationBarHeight = hasMainTabs && !MainTabsHelper.isBottomNavigationHidden() ? dp(MainTabsHelper.getMainTabsHeightWithMargins()) : 0;
+        additionFloatingButtonOffset = hasMainTabs && !MainTabsHelper.isBottomNavigationHidden() ? dp(MainTabsHelper.getMainTabsHeight() + MainTabsHelper.getMainTabsMargin()) : 0;
 
         maximumVelocity = ViewConfiguration.get(context).getScaledMaximumFlingVelocity();
 
@@ -3526,7 +3588,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         fragmentSearchFieldWatcher.setDoNotCloseAfterFieldEmpty();
 
         if (initialDialogsType == DIALOGS_TYPE_DEFAULT) {
-            optionsItem = menu.addItem(4, R.drawable.ic_ab_other);
+            optionsItem = menu.addItem(4, usesQqListTheme() ? R.drawable.nullgram_qq_add : R.drawable.ic_ab_other);
             optionsItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
             optionsItem.setOnClickListener(v -> {
                 getContactsController().loadGlobalPrivacySetting();
@@ -5842,6 +5904,17 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         checkUi_forwardCommentFieldVisible();
         checkUi_searchFieldStyle();
 
+        if (usesQqListTheme()) {
+            qqListHeader = new QqListHeader(context, () -> {
+                if (!hasMainTabs && actionBar.getBackButton() != null) actionBar.getBackButton().performClick();
+                else presentFragment(new SettingsActivity());
+            });
+            qqListHeader.bind(currentAccount);
+            qqListHeader.setStatusDrawable(statusDrawable, NyaConfig.isGhostModeActive() && NyaConfig.showGhostModeStatus.Bool() ? null : this::showSelectStatusDialog);
+            qqListHeader.setConnectionState(currentConnectionState);
+            actionBar.addView(qqListHeader, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 56, Gravity.TOP));
+            fragmentSearchField.setQqAppearance(true);
+        }
         ViewCompat.setOnApplyWindowInsetsListener(fragmentView, this::onApplyWindowInsets);
         return fragmentView;
     }
@@ -7244,6 +7317,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     @Override
     public void onResume() {
         super.onResume();
+        if (qqListHeader != null) qqListHeader.bind(currentAccount);
+        if (!onlySelect && folderId == 0 && communityId == 0 && actionBarTitleNax != null) {
+            actionBarTitleNax = TypefaceHelper.getTitleText(currentAccount);
+            actionBar.setTitle(actionBarTitleNax, statusDrawable);
+        }
         if (dialogStoriesCell != null) {
             dialogStoriesCell.onResume();
         }
@@ -7280,14 +7358,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (activity != null) {
                 checkPermission = false;
                 boolean hasNotContactsPermission = activity.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED;
-                boolean hasNotStoragePermission = (Build.VERSION.SDK_INT <= 28 || BuildVars.NO_SCOPED_STORAGE) && activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED;
                 boolean hasNotNotificationsPermission = Build.VERSION.SDK_INT >= 33 && activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED;
                 AndroidUtilities.runOnUIThread(() -> {
                     if (getParentActivity() == null) {
                         return;
                     }
                     afterSignup = false;
-                    if (hasNotNotificationsPermission || hasNotContactsPermission || hasNotStoragePermission) {
+                    if (hasNotNotificationsPermission || hasNotContactsPermission) {
                         askingForPermissions = true;
                         if (hasNotNotificationsPermission && NotificationPermissionDialog.shouldAsk(activity)) {
                             PermissionRequest.requestPermission(Manifest.permission.POST_NOTIFICATIONS, granted -> {
@@ -7309,11 +7386,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                                 askForPermissons(false);
                             });
                             showDialog(permissionDialog = builder.create());
-                        } else if (hasNotStoragePermission && activity.shouldShowRequestPermissionRationale(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-                            if (activity instanceof BasePermissionsActivity) {
-                                BasePermissionsActivity basePermissionsActivity = (BasePermissionsActivity) activity;
-                                showDialog(permissionDialog = basePermissionsActivity.createPermissionErrorAlert(R.raw.permission_request_folder, getString(R.string.PermissionStorageWithHint)));
-                            }
                         } else {
                             askForPermissons(true);
                         }
@@ -9104,7 +9176,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         final boolean isVisible = !(onlySelect && initialDialogsType != 10 || folderId != 0 || communityId != 0 || inPreviewMode || (searching && !onlySelect) || floatingButtonHidden);
 
         if (floatingButton3 != null) {
-            floatingButton3.setButtonVisible(isVisible, animated);
+            floatingButton3.setButtonVisible(isVisible && !usesQqListTheme(), animated);
         }
         if (floatingButtonStories != null) {
             floatingButtonStories.setButtonVisible(isVisible && !NyaConfig.INSTANCE.getDisableStories().Bool(), animated);
@@ -10647,20 +10719,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             permissons.add(Manifest.permission.WRITE_CONTACTS);
             permissons.add(Manifest.permission.GET_ACCOUNTS);
         }
-        if (Build.VERSION.SDK_INT >= 33) {
-            if (activity.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
-                permissons.add(Manifest.permission.READ_MEDIA_IMAGES);
-            }
-            if (activity.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED) {
-                permissons.add(Manifest.permission.READ_MEDIA_VIDEO);
-            }
-            if (activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                permissons.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            }
-        } else if ((Build.VERSION.SDK_INT <= 28 || BuildVars.NO_SCOPED_STORAGE) && activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            permissons.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-            permissons.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             permissons.add(Manifest.permission.POST_NOTIFICATIONS);
         }
@@ -10715,11 +10773,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                             getContactsController().forceImportContacts();
                         } else {
                             MessagesController.getGlobalNotificationsSettings().edit().putBoolean("askAboutContacts", askAboutContacts = false).apply();
-                        }
-                        break;
-                    case Manifest.permission.WRITE_EXTERNAL_STORAGE:
-                        if (grantResults[a] == PackageManager.PERMISSION_GRANTED) {
-                            ImageLoader.getInstance().checkMediaPaths();
                         }
                         break;
                 }
@@ -10955,6 +11008,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             int state = AccountInstance.getInstance(account).getConnectionsManager().getConnectionState();
             if (currentConnectionState != state) {
                 currentConnectionState = state;
+                if (qqListHeader != null) qqListHeader.setConnectionState(state);
                 updateProxyButton(true, false);
             }
         } else if (id == NotificationCenter.onDownloadingFilesChanged) {
@@ -14059,7 +14113,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             return;
         }
 
-        final boolean hideBottomNavigationBar = NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool();
+        final boolean hideBottomNavigationBar = MainTabsHelper.isBottomNavigationHidden();
         if (!NyaConfig.INSTANCE.getHideDrawerNightMode().Bool()) {
             final boolean isCurrentThemeDark;
             if (resourceProvider != null) {
@@ -14138,10 +14192,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
             io.addGapIf(hideBottomNavigationBar && !NyaConfig.INSTANCE.getHideDividers().Bool());
             if (hideBottomNavigationBar) {
-                io.add(R.drawable.menu_recent, getString(R.string.RecentChats), () -> {
-                    io.dismiss();
-                    BackButtonMenuRecent.show(currentAccount, this, optionsItem);
-                });
+                BackButtonMenuRecent.addMenu(this, io, optionsItem);
             }
             if (hideBottomNavigationBar && NyaConfig.INSTANCE.getHideArchive().Bool()) {
                 io.add(R.drawable.msg_archive, getString(R.string.ArchivedChats), () -> {
@@ -14633,7 +14684,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         iBlur3PositionActionBar.set(0, -additionalList, fragmentView.getMeasuredWidth(), lerp(actionBarHeight, actionBarHeightSearch, animatorSearchVisible.getFloatValue()) + additionalList );
 
         boolean hasBottomBlur = false;
-        if (hasMainTabs && !NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool()) {
+        if (hasMainTabs && !MainTabsHelper.isBottomNavigationHidden()) {
             iBlur3PositionMainTabs.set(0, mainTabTop, fragmentView.getMeasuredWidth(), mainTabBottom);
             iBlur3PositionMainTabs.inset(0, LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0 : -dp(48));
 
@@ -14899,7 +14950,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private boolean shouldShowIdleSearchField() {
-        return !NyaConfig.INSTANCE.getHideDialogsSearchField().Bool();
+        return usesQqListTheme() || !NyaConfig.INSTANCE.getHideDialogsSearchField().Bool();
     }
 
     private int getIdleSearchFieldHeight() {

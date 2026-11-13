@@ -48,7 +48,7 @@ public class TimeStringHelper {
                 .append(messageObject.messageOwner.post_author != null ? " " : "")
                 .append(createBookmarkSpan(senderNameColor))
                 .append("  ")
-                .append(LocaleController.getInstance().getFormatterDay().format((long) (messageObject.messageOwner.date) * 1000));
+                .append(LocaleController.getInstance().getFormatterDay().format((long) messageObject.getDisplayedSendDate() * 1000));
         return spannableStringBuilder;
     }
 
@@ -91,7 +91,7 @@ public class TimeStringHelper {
         if (!primaryEditedDate) {
             spannableStringBuilder
                     .append("  ")
-                    .append(LocaleController.getInstance().getFormatterDay().format((long) (messageObject.messageOwner.date) * 1000));
+                    .append(LocaleController.getInstance().getFormatterDay().format((long) messageObject.getDisplayedSendDate() * 1000));
         }
         return spannableStringBuilder;
     }
@@ -128,7 +128,7 @@ public class TimeStringHelper {
         if (!primaryEditedDate) {
             spannableStringBuilder
                     .append("  ")
-                    .append(LocaleController.getInstance().getFormatterDay().format((long) (messageObject.messageOwner.date) * 1000));
+                    .append(LocaleController.getInstance().getFormatterDay().format((long) messageObject.getDisplayedSendDate() * 1000));
         }
         return spannableStringBuilder;
     }
@@ -155,7 +155,7 @@ public class TimeStringHelper {
             }
             spannableStringBuilder
                     .append(internal ? "" : "  ")
-                    .append(internal ? "" : LocaleController.getInstance().getFormatterDay().format((long) (messageObject.messageOwner.date) * 1000));
+                    .append(internal ? "" : LocaleController.getInstance().getFormatterDay().format((long) messageObject.getDisplayedSendDate() * 1000));
         } else {
             spannableStringBuilder
                     .append(internal || messageObject.messageOwner.post_author == null ? "" : " ")
@@ -167,7 +167,7 @@ public class TimeStringHelper {
             }
             spannableStringBuilder
                     .append(internal ? "" : "  ")
-                    .append(internal ? "" : LocaleController.getInstance().getFormatterDay().format((long) (messageObject.messageOwner.date) * 1000));
+                    .append(internal ? "" : LocaleController.getInstance().getFormatterDay().format((long) messageObject.getDisplayedSendDate() * 1000));
         }
         return spannableStringBuilder;
     }

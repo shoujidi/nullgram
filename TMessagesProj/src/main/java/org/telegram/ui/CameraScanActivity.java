@@ -11,7 +11,6 @@ import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -48,6 +47,7 @@ import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
 import androidx.dynamicanimation.animation.FloatValueHolder;
 import androidx.dynamicanimation.animation.SpringAnimation;
@@ -64,6 +64,8 @@ import com.google.zxing.Result;
 import com.google.zxing.ResultPoint;
 import com.google.zxing.common.GlobalHistogramBinarizer;
 import com.google.zxing.qrcode.QRCodeReader;
+
+import com.nullgram.client.permissions.VisualMediaAccess;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
@@ -98,6 +100,7 @@ import java.util.ArrayList;
 
 public class CameraScanActivity extends BaseFragment {
 
+    private @Nullable OrientationController.Request portraitRequest;
     private TextView titleTextView;
     private TextView descriptionText;
     private CameraView cameraView;
@@ -275,7 +278,10 @@ public class CameraScanActivity extends BaseFragment {
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
         destroy(false, null);
-        AndroidUtilities.unlockOrientation(getParentActivity());
+        if (portraitRequest != null) {
+            portraitRequest.release();
+            portraitRequest = null;
+        }
         if (visionQrReader != null) {
             visionQrReader.release();
         }
@@ -675,16 +681,10 @@ public class CameraScanActivity extends BaseFragment {
                         return;
                     }
                     final Activity activity = getParentActivity();
-                    if (Build.VERSION.SDK_INT >= 33) {
-                        if (activity.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
-                            activity.requestPermissions(new String[]{Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO}, BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE);
-                            return;
-                        }
-                    } else if (Build.VERSION.SDK_INT >= 23) {
-                        if (activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                            activity.requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE);
-                            return;
-                        }
+                    if (!VisualMediaAccess.canRead(VisualMediaAccess.current(activity), true, false)) {
+                        activity.requestPermissions(VisualMediaAccess.permissionsFor(true, false),
+                                BasePermissionsActivity.REQUEST_CODE_VISUAL_MEDIA);
+                        return;
                     }
                     PhotoAlbumPickerActivity fragment = new PhotoAlbumPickerActivity(PhotoAlbumPickerActivity.SELECT_TYPE_QR, false, false, null);
                     fragment.setMaxSelectedPhotos(1, false);
@@ -767,7 +767,10 @@ public class CameraScanActivity extends BaseFragment {
             });
         }
 
-        AndroidUtilities.lockOrientation(getParentActivity(), ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        final OrientationController orientation = OrientationController.of(getParentActivity());
+        if (orientation != null && portraitRequest == null) {
+            portraitRequest = orientation.requestPortrait();
+        }
         fragmentView.setKeepScreenOn(true);
 
         return fragmentView;

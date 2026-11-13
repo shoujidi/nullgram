@@ -87,6 +87,8 @@ import androidx.dynamicanimation.animation.DynamicAnimation;
 import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator;
 
+import com.nullgram.client.permissions.VisualMediaAccess;
+
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.AnimationNotificationsLocker;
 import org.telegram.messenger.ApplicationLoader;
@@ -7226,23 +7228,9 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
     }
 
     private boolean requestGalleryPermission() {
-        if (activity != null) {
-            boolean noGalleryPermission = false;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                noGalleryPermission = (
-                    activity.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED ||
-                    activity.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED
-                );
-                if (noGalleryPermission) {
-                    activity.requestPermissions(new String[]{Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO}, 114);
-                }
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                noGalleryPermission = activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED;
-                if (noGalleryPermission) {
-                    activity.requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 114);
-                }
-            }
-            return !noGalleryPermission;
+        if (activity != null && !VisualMediaAccess.canRead(VisualMediaAccess.current(activity), true, true)) {
+            activity.requestPermissions(VisualMediaAccess.permissionsFor(true, true), 114);
+            return false;
         }
         return true;
     }
@@ -7328,8 +7316,8 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
                 }
             }
         } else if (requestCode == 114) {
-            if (granted) {
-                MediaController.loadGalleryPhotosAlbums(0);
+            if (VisualMediaAccess.canRead(VisualMediaAccess.current(activity), true, true)) {
+                MediaController.refreshGalleryAccess();
                 animateGalleryListView(true);
             } else {
                 new AlertDialog.Builder(getContext(), resourcesProvider)

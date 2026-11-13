@@ -647,7 +647,7 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter implements
         View view;
         switch (viewType) {
             case VIEW_TYPE_DIALOG_COMMUNITY:
-                DialogCell dialogCell2 = new DialogCell(parentFragment, mContext, true, false, currentAccount, null);
+                DialogCell dialogCell2 = new DialogCell(parentFragment, mContext, true, false, currentAccount, parentFragment != null && parentFragment.usesQqListTheme() ? parentFragment.getResourceProvider() : null);
                 if (communityId != 0) {
                     dialogCell2.insideCommunityList = true;
                     dialogCell2.insideCommunityListNoDialog = true;
@@ -660,7 +660,7 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter implements
                     dialogsType == DialogsActivity.DIALOGS_TYPE_BOT_REQUEST_PEER) {
                     view = new ProfileSearchCell(mContext);
                 } else {
-                    DialogCell dialogCell = new DialogCell(parentFragment, mContext, true, false, currentAccount, null);
+                    DialogCell dialogCell = new DialogCell(parentFragment, mContext, true, false, currentAccount, parentFragment != null && parentFragment.usesQqListTheme() ? parentFragment.getResourceProvider() : null);
                     if (showOpenBotButton()) {
                         dialogCell.allowBotOpenButton(true, this::onOpenBot);
                     }

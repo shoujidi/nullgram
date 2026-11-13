@@ -231,6 +231,7 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
     private final static int done_button = 1;
 
     private final static int fake_done_button = 100;
+    private String initialLocalName;
 
     private int realAdminCount = 0;
 
@@ -1660,7 +1661,16 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
         undoView = new UndoView(context);
         sizeNotifierFrameLayout.addView(undoView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT, 8, 0, 8, 8));
 
-        nameTextView.setText(Emoji.replaceEmoji(currentUser != null ? ContactsController.formatName(currentUser) : currentChat.title, nameTextView.getEditText().getPaint().getFontMetricsInt(), true));
+        String editName;
+        if (currentUser != null) {
+            editName = canEditBotInfo() ? ContactsController.formatName(currentUser)
+                    : LocalNameHelper.name(currentAccount, currentUser);
+        } else {
+            editName = ChatObject.canChangeChatInfo(currentChat) ? currentChat.title
+                    : LocalNameHelper.name(currentAccount, currentChat);
+        }
+        initialLocalName = editName;
+        nameTextView.setText(Emoji.replaceEmoji(editName, nameTextView.getEditText().getPaint().getFontMetricsInt(), true));
         nameTextView.setSelection(nameTextView.length());
         if (info != null) {
             descriptionTextView.setText(info.about);
@@ -2058,7 +2068,7 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
     private boolean checkDiscard(boolean invoked) {
         if (userId != 0) {
             String about = userInfo != null && userInfo.about != null ? userInfo.about : "";
-            if (nameTextView != null && !currentUser.first_name.equals(nameTextView.getText().toString()) ||
+            if (nameTextView != null && !TextUtils.equals(canEditBotInfo() ? currentUser.first_name : initialLocalName, nameTextView.getText().toString()) ||
                     descriptionTextView != null && !about.equals(descriptionTextView.getText().toString())) {
                 if (invoked) {
                     showDialog(new AlertDialog.Builder(getParentActivity())
@@ -2080,7 +2090,7 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
 
         String about = info != null && info.about != null ? info.about : "";
         if (info != null && ChatObject.isChannel(currentChat) && info.hidden_prehistory != historyHidden ||
-            nameTextView != null && !currentChat.title.equals(nameTextView.getText().toString()) ||
+            nameTextView != null && !TextUtils.equals(ChatObject.canChangeChatInfo(currentChat) ? currentChat.title : initialLocalName, nameTextView.getText().toString()) ||
             descriptionTextView != null && !about.equals(descriptionTextView.getText().toString()) ||
             forum != currentChat.forum
         ) {
@@ -2887,68 +2897,17 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
     }
 
     private void setBotNameOverride() {
-        if (currentUser == null || nameTextView == null) {
-            return;
+        if (currentUser != null) {
+            LocalNameHelper.saveEditedName(currentAccount, currentUser.id, initialLocalName, nameTextView.getText().toString());
+            finishFragment();
         }
-        String existingOverride = LocalNameHelper.getUserNameOverride(userId);
-        String newName = nameTextView.getText().toString().trim();
-        if (existingOverride != null) {
-            if (newName.equals(existingOverride)) {
-                finishFragment();
-                return;
-            }
-            if (newName.isEmpty()) {
-                LocalNameHelper.clearUserNameOverride(userId);
-                getMessagesController().loadFullUser(currentUser, 0, true);
-                AndroidUtilities.runOnUIThread(() -> getNotificationCenter().postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_NAME), 200);
-                finishFragment();
-                return;
-            }
-        } else {
-            if (newName.isEmpty() || newName.equals(currentUser.first_name)) {
-                finishFragment();
-                return;
-            }
-        }
-        LocalNameHelper.setUserNameOverride(userId, newName);
-        currentUser.first_name = newName;
-        currentUser.last_name = "";
-        getMessagesController().putUser(currentUser, false);
-        AndroidUtilities.runOnUIThread(() -> getNotificationCenter().postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_NAME), 200);
-        AndroidUtil.performHapticFeedback();
-        finishFragment();
     }
 
     private void setChatNameOverride() {
-        if (currentChat == null || nameTextView == null) {
-            return;
+        if (currentChat != null) {
+            LocalNameHelper.saveEditedName(currentAccount, -currentChat.id, initialLocalName, nameTextView.getText().toString());
+            finishFragment();
         }
-        String existingOverride = LocalNameHelper.getChatNameOverride(currentChat.id);
-        String newName = nameTextView.getText().toString().trim();
-        if (existingOverride != null) {
-            if (newName.equals(existingOverride)) {
-                finishFragment();
-                return;
-            }
-            if (newName.isEmpty()) {
-                LocalNameHelper.clearChatNameOverride(currentChat.id);
-                getMessagesController().loadFullChat(currentChat.id, 0, true);
-                AndroidUtilities.runOnUIThread(() -> getNotificationCenter().postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_CHAT_NAME), 200);
-                finishFragment();
-                return;
-            }
-        } else {
-            if (newName.isEmpty() || newName.equals(currentChat.title)) {
-                finishFragment();
-                return;
-            }
-        }
-        LocalNameHelper.setChatNameOverride(currentChat.id, newName);
-        currentChat.title = newName;
-        getMessagesController().putChat(currentChat, false);
-        AndroidUtilities.runOnUIThread(() -> getNotificationCenter().postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_CHAT_NAME), 200);
-        AndroidUtil.performHapticFeedback();
-        finishFragment();
     }
     // local name override end
 }

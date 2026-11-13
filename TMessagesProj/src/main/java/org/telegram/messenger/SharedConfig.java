@@ -634,41 +634,9 @@ public class SharedConfig {
                 passcodeSalt = new byte[0];
             }
             lastUpdateCheckTime = preferences.getLong("appUpdateCheckTime", System.currentTimeMillis());
-            try {
-                String update = preferences.getString("appUpdate", null);
-                if (update != null) {
-                    pendingAppUpdateBuildVersion = preferences.getInt("appUpdateBuild", buildVersion());
-                    byte[] arr = Base64.decode(update, Base64.DEFAULT);
-                    if (arr != null) {
-                        SerializedData data = new SerializedData(arr);
-                        pendingAppUpdate = (TLRPC.TL_help_appUpdate) TLRPC.help_AppUpdate.TLdeserialize(data, data.readInt32(false), false);
-                        data.cleanup();
-                    }
-                }
-                if (pendingAppUpdate != null) {
-                    long updateTime = 0;
-                    int updateVersion = 0;
-                    String updateVersionString = null;
-                    try {
-                        PackageInfo packageInfo = ApplicationLoader.applicationContext.getPackageManager().getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
-                        updateVersion = packageInfo.versionCode;
-                        updateVersionString = packageInfo.versionName;
-                    } catch (Exception e) {
-                        FileLog.e(e);
-                    }
-                    if (updateVersion == 0) {
-                        updateVersion = buildVersion();
-                    }
-                    if (updateVersionString == null) {
-                        updateVersionString = BuildVars.BUILD_VERSION_STRING;
-                    }
-                    if (pendingAppUpdateBuildVersion != updateVersion || pendingAppUpdate.version == null || updateVersionString.compareTo(pendingAppUpdate.version) >= 0 || BuildVars.DEBUG_PRIVATE_VERSION) {
-                        pendingAppUpdate = null;
-                        AndroidUtilities.runOnUIThread(SharedConfig::saveConfig);
-                    }
-                }
-            } catch (Exception e) {
-                FileLog.e(e);
+            // Nullgram builds no longer use the Niagram release channels.
+            if (preferences.contains("appUpdate") || preferences.contains("appUpdateBuild")) {
+                preferences.edit().remove("appUpdate").remove("appUpdateBuild").apply();
             }
 
             preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);

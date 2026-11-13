@@ -8,6 +8,8 @@
 
 package org.telegram.ui.Adapters;
 
+import top.nkbe.niagram.helpers.LocalNameHelper;
+
 import static org.telegram.messenger.AndroidUtilities.dp;
 
 import android.content.Context;
@@ -1942,6 +1944,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 cell.allowBotOpenButton(isRecent, this::openBotApp);
                 cell.setOnSponsoredOptionsClick(this::openSponsoredOptions);
                 cell.setAd(obj instanceof TLRPC.TL_sponsoredPeer ? (TLRPC.TL_sponsoredPeer) obj : null);
+                String alias = user != null ? LocalNameHelper.get(currentAccount, user.id)
+                        : chat != null ? LocalNameHelper.get(currentAccount, -chat.id) : null;
+                if (!savedMessages && alias != null) {
+                    name = alias;
+                }
                 cell.setData(user != null ? user : chat, encryptedChat, name, username, true, savedMessages);
                 cell.setChecked(delegate.isSelected(cell.getDialogId()), oldDialogId == cell.getDialogId());
                 break;

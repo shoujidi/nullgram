@@ -31,8 +31,15 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.nullgram.client.repeat.RepeatConfig;
+import com.nullgram.client.repeat.RepeatDefaults;
+import com.nullgram.client.repeat.RepeatDialog;
+import com.nullgram.client.repeat.RepeatTask;
+
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.BuildConfig;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.ui.ActionBar.ActionBar;
@@ -72,6 +79,9 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
     private int generalRow;
     private int translatorRow;
     private int keywordRow;
+    private int disguiseRow;
+    private int existingRepeatDefaultsRow;
+    private int newRepeatDefaultsRow;
     private int chatRow;
     private int ghostRow;
     private int spyRow;
@@ -94,7 +104,10 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
 
         generalRow = addRow();
         chatRow = addRow();
+        existingRepeatDefaultsRow = addRow();
+        newRepeatDefaultsRow = addRow();
         keywordRow = addRow();
+        disguiseRow = BuildConfig.NULLGRAM_DISGUISE ? addRow() : -1;
         ghostRow = addRow();
         spyRow = addRow();
         translatorRow = addRow();
@@ -334,11 +347,30 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
         return getString(R.string.NekoSettings);
     }
 
+    private String repeatDefaultsTitle(RepeatTask.Type type) {
+        return getString(type == RepeatTask.Type.EXISTING
+                ? R.string.NullgramExistingRepeatDefaults : R.string.NullgramNewRepeatDefaults);
+    }
+
+    private void showRepeatDefaultsDialog(RepeatTask.Type type, int position) {
+        Activity parent = getParentActivity();
+        if (parent == null) return;
+        showDialog(RepeatDialog.createDefaultsEditor(parent, resourceProvider, type, repeatDefaultsTitle(type),
+                () -> listAdapter.notifyItemChanged(position)));
+    }
+
     @SuppressLint("ApplySharedPref")
     @Override
     protected void onItemClick(View view, int position, float x, float y) {
-        if (position == keywordRow) {
+        if (position == disguiseRow) {
+            var disguise = new com.nullgram.client.appearance.DisguiseSettingsActivity();
+            disguise.setCurrentAccount(currentAccount);
+            presentFragment(disguise);
+        } else if (position == keywordRow) {
             presentFragment(new com.nullgram.client.keyword.KeywordSettingsActivity());
+        } else if (position == existingRepeatDefaultsRow || position == newRepeatDefaultsRow) {
+            showRepeatDefaultsDialog(position == existingRepeatDefaultsRow
+                    ? RepeatTask.Type.EXISTING : RepeatTask.Type.NEW_MESSAGE, position);
         } else if (position == chatRow) {
             presentFragment(new NekoChatSettingsActivity());
         } else if (position == generalRow) {
@@ -404,8 +436,16 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
                 }
                 case TYPE_TEXT: {
                     TextCell textCell = (TextCell) holder.itemView;
-                    if (position == keywordRow) {
+                    if (position == disguiseRow) {
+                        textCell.setTextAndIcon(getString(R.string.NullgramDisguise), R.drawable.msg_customize, true);
+                    } else if (position == keywordRow) {
                         textCell.setTextAndIcon(getString(R.string.NullgramKeywordTitle), R.drawable.msg_info, true);
+                    } else if (position == existingRepeatDefaultsRow || position == newRepeatDefaultsRow) {
+                        RepeatTask.Type type = position == existingRepeatDefaultsRow
+                                ? RepeatTask.Type.EXISTING : RepeatTask.Type.NEW_MESSAGE;
+                        String value = LocaleController.formatString(R.string.NullgramRepeatDefaultsValue,
+                                RepeatDefaults.getCount(type), RepeatConfig.formatSeconds(RepeatDefaults.getIntervalMs(type)));
+                        textCell.setTextAndValueAndIcon(repeatDefaultsTitle(type), value, R.drawable.msg_repeat, true);
                     } else if (position == chatRow) {
                         textCell.setTextAndIcon(getString(R.string.Chat), R.drawable.msg_discussion, true);
                     } else if (position == generalRow) {
@@ -441,7 +481,8 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity {
         public int getItemViewType(int position) {
             if (position == categoriesEndRow || position == nSettingsEndRow) {
                 return TYPE_SHADOW;
-            } else if (position == keywordRow || position == chatRow || position == generalRow || position == ghostRow || position == spyRow || position == passcodeRow || position == experimentRow || position == translatorRow ||
+            } else if (position == disguiseRow || position == keywordRow || position == existingRepeatDefaultsRow || position == newRepeatDefaultsRow ||
+                    position == chatRow || position == generalRow || position == ghostRow || position == spyRow || position == passcodeRow || position == experimentRow || position == translatorRow ||
                     position == importSettingsRow || position == exportSettingsRow || position == resetSettingsRow || position == appRestartRow ||
                     position == aboutRow) {
                 return TYPE_TEXT;

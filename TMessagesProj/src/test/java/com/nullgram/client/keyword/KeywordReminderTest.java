@@ -66,7 +66,7 @@ public class KeywordReminderTest {
         final Handler handler = new Handler(Looper.getMainLooper());
         final List<Runnable> submitted = new ArrayList<>();
         int cancelled;
-        public void post(Runnable action) { submitted.add(action); handler.post(action); }
+        public void post(Runnable action, long delayMillis) { submitted.add(action); handler.postDelayed(action, delayMillis); }
         public void cancel(Runnable action) { cancelled++; handler.removeCallbacks(action); }
     }
     private KeywordReminderController create() {
@@ -307,7 +307,7 @@ public class KeywordReminderTest {
             public void register(int account) { }
             public void unregister(int account) { }
         }, new KeywordReminderEngine.Tasks() {
-            public void post(Runnable action) { queue.add(action); }
+            public void post(Runnable action, long delayMillis) { queue.add(action); }
             public void cancel(Runnable action) { queue.remove(action); }
         }, (message, account, user) -> true, KeywordReminderEngine::contains);
         assertTrue(bounded.enable(0, 500));

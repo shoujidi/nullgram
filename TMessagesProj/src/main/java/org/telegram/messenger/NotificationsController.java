@@ -8,6 +8,8 @@
 
 package org.telegram.messenger;
 
+import top.nkbe.niagram.helpers.LocalNameHelper;
+
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
@@ -64,7 +66,7 @@ import androidx.core.content.pm.ShortcutManagerCompat;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.graphics.drawable.IconCompat;
 
-import com.google.common.collect.Lists;
+
 
 import org.telegram.messenger.support.LongSparseIntArray;
 import org.telegram.messenger.utils.tlutils.TLKeyboardHelper;
@@ -1186,7 +1188,7 @@ public class NotificationsController extends BaseController implements Notificat
                     if (now > expire_date) continue;
                     AndroidUtilities.runOnUIThread(() -> {
                         final LongSparseArray<ArrayList<Integer>> deletedMessages = new LongSparseArray<>();
-                        deletedMessages.put(0, Lists.newArrayList(msg_id));
+                        deletedMessages.put(0, new ArrayList<>(Collections.singletonList(msg_id)));
                         removeDeletedMessagesFromNotifications(deletedMessages, false);
                     }, (expire_date - now) * 1000L);
                 }
@@ -1872,6 +1874,14 @@ public class NotificationsController extends BaseController implements Notificat
                 !NyaConfig.INSTANCE.getShowNotificationPreviewWhenLocked().Bool();
     }
 
+    private String localPushName(MessageObject message) {
+        return LocalNameHelper.name(currentAccount, message.getDialogId(), message.localName);
+    }
+
+    private String localPushSenderName(MessageObject message) {
+        return LocalNameHelper.name(currentAccount, message.getFromChatId(), message.localUserName);
+    }
+
     public String getShortStringForMessage(MessageObject messageObject, String[] userName, boolean[] preview) {
         if (shouldHideNotificationContentForPasscode()) {
             return LocaleController.getString(R.string.NotificationHiddenMessage);
@@ -1887,7 +1897,7 @@ public class NotificationsController extends BaseController implements Notificat
         if (messageObject.isFcmMessage()) {
             if (chat_id == 0 && fromId != 0) {
                 if (Build.VERSION.SDK_INT > Build.VERSION_CODES.O_MR1) {
-                    userName[0] = messageObject.localName;
+                    userName[0] = localPushName(messageObject);
                 }
                 if (!dialogPreviewEnabled || !preferences.getBoolean("EnablePreviewAll", true)) {
                     if (preview != null) {
@@ -1897,18 +1907,18 @@ public class NotificationsController extends BaseController implements Notificat
                 }
             } else if (chat_id != 0) {
                 if (messageObject.messageOwner.peer_id.channel_id == 0 || messageObject.isSupergroup()) {
-                    userName[0] = messageObject.localUserName;
+                    userName[0] = localPushSenderName(messageObject);
                 } else if (Build.VERSION.SDK_INT > Build.VERSION_CODES.O_MR1) {
-                    userName[0] = messageObject.localName;
+                    userName[0] = localPushName(messageObject);
                 }
                 if (!dialogPreviewEnabled || !messageObject.localChannel && !preferences.getBoolean("EnablePreviewGroup", true) || messageObject.localChannel && !preferences.getBoolean("EnablePreviewChannel", true)) {
                     if (preview != null) {
                         preview[0] = false;
                     }
                     if (messageObject.messageOwner.peer_id.channel_id != 0 && !messageObject.isSupergroup()) {
-                        return LocaleController.formatString(R.string.ChannelMessageNoText, messageObject.localName);
+                        return LocaleController.formatString(R.string.ChannelMessageNoText, localPushName(messageObject));
                     } else {
-                        return LocaleController.formatString(R.string.NotificationMessageGroupNoText, messageObject.localUserName, messageObject.localName);
+                        return LocaleController.formatString(R.string.NotificationMessageGroupNoText, localPushSenderName(messageObject), localPushName(messageObject));
                     }
                 }
             }
@@ -1939,7 +1949,7 @@ public class NotificationsController extends BaseController implements Notificat
         if (fromId > 0) {
             TLRPC.User user = getMessagesController().getUser(fromId);
             if (user != null) {
-                name = UserObject.getUserName(user);
+                name = LocalNameHelper.name(currentAccount, user);
                 if (chat_id != 0) {
                     userName[0] = name;
                 } else {
@@ -2068,7 +2078,7 @@ public class NotificationsController extends BaseController implements Notificat
                             for (int a = 0; a < messageObject.messageOwner.action.users.size(); a++) {
                                 TLRPC.User user = getMessagesController().getUser(messageObject.messageOwner.action.users.get(a));
                                 if (user != null) {
-                                    String name2 = UserObject.getUserName(user);
+                                    String name2 = LocalNameHelper.name(currentAccount, user);
                                     if (names.length() != 0) {
                                         names.append(", ");
                                     }
@@ -2105,7 +2115,7 @@ public class NotificationsController extends BaseController implements Notificat
                             for (int a = 0; a < messageObject.messageOwner.action.users.size(); a++) {
                                 TLRPC.User user = getMessagesController().getUser(messageObject.messageOwner.action.users.get(a));
                                 if (user != null) {
-                                    String name2 = UserObject.getUserName(user);
+                                    String name2 = LocalNameHelper.name(currentAccount, user);
                                     if (names.length() != 0) {
                                         names.append(", ");
                                     }
@@ -2587,7 +2597,7 @@ public class NotificationsController extends BaseController implements Notificat
                     if (preview != null) {
                         preview[0] = false;
                     }
-                    return LocaleController.formatString(R.string.NotificationMessageNoText, messageObject.localName);
+                    return LocaleController.formatString(R.string.NotificationMessageNoText, localPushName(messageObject));
                 }
             } else if (chatId != 0) {
                 if (!dialogPreviewEnabled || !messageObject.localChannel && !preferences.getBoolean("EnablePreviewGroup", true) || messageObject.localChannel && !preferences.getBoolean("EnablePreviewChannel", true)) {
@@ -2595,9 +2605,9 @@ public class NotificationsController extends BaseController implements Notificat
                         preview[0] = false;
                     }
                     if (messageObject.messageOwner.peer_id.channel_id != 0 && !messageObject.isSupergroup()) {
-                        return LocaleController.formatString(R.string.ChannelMessageNoText, messageObject.localName);
+                        return LocaleController.formatString(R.string.ChannelMessageNoText, localPushName(messageObject));
                     } else {
-                        return LocaleController.formatString(R.string.NotificationMessageGroupNoText, messageObject.localUserName, messageObject.localName);
+                        return LocaleController.formatString(R.string.NotificationMessageGroupNoText, localPushSenderName(messageObject), localPushName(messageObject));
                     }
                 }
             }
@@ -2635,7 +2645,7 @@ public class NotificationsController extends BaseController implements Notificat
             } else {
                 TLRPC.User user = getMessagesController().getUser(fromId);
                 if (user != null) {
-                    name = UserObject.getUserName(user);
+                    name = LocalNameHelper.name(currentAccount, user);
                 }
             }
         } else {
@@ -2858,7 +2868,7 @@ public class NotificationsController extends BaseController implements Notificat
                                 for (int a = 0; a < messageObject.messageOwner.action.users.size(); a++) {
                                     TLRPC.User user = getMessagesController().getUser(messageObject.messageOwner.action.users.get(a));
                                     if (user != null) {
-                                        String name2 = UserObject.getUserName(user);
+                                        String name2 = LocalNameHelper.name(currentAccount, user);
                                         if (names.length() != 0) {
                                             names.append(", ");
                                         }
@@ -2895,7 +2905,7 @@ public class NotificationsController extends BaseController implements Notificat
                                 for (int a = 0; a < messageObject.messageOwner.action.users.size(); a++) {
                                     TLRPC.User user = getMessagesController().getUser(messageObject.messageOwner.action.users.get(a));
                                     if (user != null) {
-                                        String name2 = UserObject.getUserName(user);
+                                        String name2 = LocalNameHelper.name(currentAccount, user);
                                         if (names.length() != 0) {
                                             names.append(", ");
                                         }
@@ -4326,11 +4336,11 @@ public class NotificationsController extends BaseController implements Notificat
             String chatName;
             boolean replace = true;
             if (((chatId != 0 && chat == null) || user == null) && lastMessageObject.isFcmMessage()) {
-                chatName = lastMessageObject.localName;
+                chatName = localPushName(lastMessageObject);
             } else if (chat != null) {
                 chatName = getTitle(chat);
             } else {
-                chatName = UserObject.getUserName(user);
+                chatName = LocalNameHelper.name(currentAccount, user);
             }
             boolean hideNotificationContent = shouldHideNotificationContentForPasscode();
             final boolean allowSummary = !"samsung".equalsIgnoreCase(Build.MANUFACTURER);
@@ -5083,7 +5093,7 @@ public class NotificationsController extends BaseController implements Notificat
                     user = getMessagesController().getUser(dialogId);
                     if (user == null) {
                         if (lastMessageObject.isFcmMessage()) {
-                            name = lastMessageObject.localName;
+                            name = localPushName(lastMessageObject);
                         } else {
                             if (BuildVars.LOGS_ENABLED) {
                                 FileLog.w("not found user to show dialog notification " + dialogId);
@@ -5091,7 +5101,7 @@ public class NotificationsController extends BaseController implements Notificat
                             continue;
                         }
                     } else {
-                        name = UserObject.getUserName(user);
+                        name = LocalNameHelper.name(currentAccount, user);
                         if (user.photo != null && user.photo.photo_small != null && user.photo.photo_small.volume_id != 0 && user.photo.photo_small.local_id != 0) {
                             photoPath = user.photo.photo_small;
                         }
@@ -5111,7 +5121,7 @@ public class NotificationsController extends BaseController implements Notificat
                         canReply = false;
                         if (lastMessageObject.isFcmMessage()) {
                             isSupergroup = lastMessageObject.isSupergroup();
-                            name = lastMessageObject.localName;
+                            name = localPushName(lastMessageObject);
                             isChannel = lastMessageObject.localChannel;
                         } else {
                             if (BuildVars.LOGS_ENABLED) {
@@ -6542,7 +6552,7 @@ public class NotificationsController extends BaseController implements Notificat
         if (chat.monoforum) {
             return ForumUtilities.getMonoForumTitle(currentAccount, chat);
         } else {
-            return chat.title;
+            return LocalNameHelper.name(currentAccount, chat);
         }
     }
 }

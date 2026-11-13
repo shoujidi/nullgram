@@ -51,7 +51,9 @@ import java.util.zip.GZIPOutputStream;
 import top.nkbe.niagram.utils.GsonUtil;
 
 public class CloudSettingsHelper {
-    public static final SharedPreferences.OnSharedPreferenceChangeListener listener = (preferences, key) -> CloudSettingsHelper.getInstance().doAutoSync();
+    public static final SharedPreferences.OnSharedPreferenceChangeListener listener = (preferences, key) -> {
+        if (!LocalNameHelper.isAliasKey(key)) CloudSettingsHelper.getInstance().doAutoSync();
+    };
     private static final SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekocloud", Context.MODE_PRIVATE);
     private final SparseArray<Long> cloudSyncedDate = new SparseArray<>();
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -310,7 +312,7 @@ public class CloudSettingsHelper {
                     } else {
                         json = payload;
                     }
-                    SettingsBackupHelper.importSettings(GsonUtil.toJsonObject(json));
+                    SettingsBackupHelper.importSettings(GsonUtil.toJsonObject(json), true);
                     localSyncedDate = System.currentTimeMillis();
                     preferences.edit().putLong("updated_at", localSyncedDate).apply();
                     callback.run(true, null);

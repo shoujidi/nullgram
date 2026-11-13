@@ -2699,6 +2699,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         super(context);
         this.resourcesProvider = resourcesProvider;
         this.isChat = isChat;
+        parentFragment = fragment;
         updateIosLayoutSeeds();
         int attachButtonRightDp = isIosButtonPlacement() ? 0 : (isIosInputAppearance() ? iosGapDp : 0);
 
@@ -3762,6 +3763,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         checkChannelRights();
 
         createMessageEditText();
+
     }
 
     public void setViewParentForEmoji(ViewGroup viewParent) {
@@ -3786,9 +3788,7 @@ public class ChatActivityEnterView extends FrameLayout implements
 
                 oldSendButton.setVisibility(View.GONE);
             }
-            if (paidMessagesPrice > 0 || isLiveComment) {
-                sendButton.setStarsPrice(paidMessagesPrice, 1);
-            }
+            sendButton.setStarsPrice(paidMessagesPrice, 1);
             updateFieldRight(lastAttachVisible);
         }
         if (isLiveComment) {
@@ -3879,11 +3879,11 @@ public class ChatActivityEnterView extends FrameLayout implements
             messageSendPreview = null;
         }
         parentFragment.showDialog(com.nullgram.client.repeat.RepeatDialog.create(parentActivity, resourcesProvider, draft,
-                com.nullgram.client.repeat.RepeatConfig.NEW_DEFAULT_COUNT, (count, interval) -> {
+                com.nullgram.client.repeat.RepeatTask.Type.NEW_MESSAGE, (count, interval) -> {
             if (!isAttachedToWindow() || currentAccount != account || dialog_id != target
                     || !canRepeatNewMessage() || !TextUtils.equals(messageEditText.getTextToUse(), draft)) return false;
-            boolean started = com.nullgram.client.repeat.RepeatController.get(account).startTask(target,
-                    com.nullgram.client.repeat.RepeatTask.Type.NEW_MESSAGE, count, interval, sender);
+            boolean started = com.nullgram.client.repeat.RepeatController.startTask(account, target,
+                    com.nullgram.client.repeat.RepeatTask.Type.NEW_MESSAGE, count, interval, 1, sender);
             if (!started) {
                 if (com.nullgram.client.repeat.RepeatController.get(account).getTaskState() == com.nullgram.client.repeat.RepeatTaskState.RUNNING)
                     android.widget.Toast.makeText(getContext(), LocaleController.getString(R.string.NullgramRepeatBusy), android.widget.Toast.LENGTH_SHORT).show();
@@ -5062,10 +5062,20 @@ public class ChatActivityEnterView extends FrameLayout implements
     public boolean isStories;
 
     public boolean isIosButtonPlacement() {
+        if (usesQqAppearance()) return false;
         return NyaConfig.INSTANCE.getIosButtonPlacement().Bool();
     }
 
+    private boolean usesQqAppearance() {
+        return parentFragment != null && parentFragment.usesQqChatTheme();
+    }
+
+    private final Rect qqFieldBounds = new Rect();
+    private final com.nullgram.client.appearance.QqComposerBackground qqComposerBackground =
+            new com.nullgram.client.appearance.QqComposerBackground();
+
     public boolean isIosInputAppearance() {
+        if (usesQqAppearance()) return false;
         return NyaConfig.INSTANCE.getIosInputAppearance().Bool();
     }
 
@@ -5175,6 +5185,18 @@ public class ChatActivityEnterView extends FrameLayout implements
     }
 
     public void drawBackground(Canvas canvas, boolean withComposeShadowDrawable) {
+        if (usesQqAppearance() && shouldDrawBackground) {
+            Rect field = null;
+            if (messageEditText != null && messageEditText.getWidth() > 0
+                    && messageEditText.getVisibility() == VISIBLE && messageEditText.getAlpha() > 0
+                    && !recordingAudioVideo && audioToSend == null && videoToSendMessageObject == null && !richDraftActive) {
+                qqFieldBounds.set(0, 0, messageEditText.getWidth(), messageEditText.getHeight());
+                offsetDescendantRectToMyCoords(messageEditText, qqFieldBounds);
+                field = qqFieldBounds;
+            }
+            qqComposerBackground.draw(canvas, getWidth(), getHeight(), repeatStatusHeight, field);
+            return;
+        }
         if (!shouldDrawBackground) {
             return;
         }

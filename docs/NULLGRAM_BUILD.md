@@ -1,6 +1,6 @@
 # Nullgram build and source delivery
 
-Modified 2026-11-01 from Niagram revision `bc99e5e9907a2ea47d9e6ed432469b8ff553644f`.
+Migrated to Niagram 13.1.1 (1311), revision `c819d178d0fed124117558054cddbf64dc746cfa`.
 Application display name: Nullgram. Installation ID remains **top.nkbe.niagram**.
 Internal namespaces, contact authorities, service configuration and native libraries retain the upstream identity.
 The provided debug APK uses a local development signing key. Recipients build with their own private key.
@@ -11,17 +11,16 @@ The provided debug APK uses a local development signing key. Recipients build wi
 - Android SDK platform `android-37.0`, Build Tools `37.0.0`.
 - NDK `27.2.12479018`, CMake `3.31.6` or the compatible upstream toolchain.
 - Network access for declared Gradle/Maven dependencies and the upstream native build tools.
-- All pinned submodule sources are included in the matching source archive. The archive is a source snapshot without `.git` metadata.
+- Clone the corresponding Git tag with `git clone --recurse-submodules --branch v13.0.10 https://github.com/shoujidi/nullgram.git`. Use `v13.0.10-disguise` for the disguise APK. GitHub automatic source ZIP downloads do not include submodules.
 
-For a fresh upstream Git clone initialize recursive submodules and apply the preparation patch already
+After initializing recursive submodules, apply the preparation patch already
 specified by upstream `.github/workflows/pr.yml`:
 `TMessagesProj/jni/patches/tgcalls-0001-feat-custom-group-voip-audio-bitrate.patch`.
-**The source archive already includes that patch's two modified files. Do not apply it twice.**
-Submodule revisions and file hashes are recorded in the accompanying source manifest.
+From `TMessagesProj/jni`, run `bash ./patches/tgcalls.sh` once. Gitlinks pin submodule revisions.
 
 Set Android `sdk.dir` and the existing `KEYSTORE_PATH`, `KEYSTORE_PASS`, `ALIAS_NAME`, `ALIAS_PASS`
 properties in your own ignored `local.properties`. Generate your own Android development keystore.
-No keystore, password, local properties, account data, caches or build outputs are in the source archive.
+No keystore, password, local properties, account data, heap dumps, personal artwork, caches or build outputs are published.
 The upstream `google-services.json` is retained because the package is retained; no separate Firebase project is required for this local variant.
 
 For the arm64 build set environment `NATIVE_TARGET=arm64-v8a`, then run:
@@ -61,7 +60,7 @@ and unified stop control are retained. Server limits and network conditions stil
 
 See root `LICENSE`, `UPSTREAM.md`, `docs/UPSTREAM_README.md`, and the original third-party
 copyright/license files in the included sources. The app's About → GPLv3 dialog shows the source
-attribution and full GPLv3 text offline. Distribute the matching full source snapshot and build instructions
+attribution and full GPLv3 text offline. Provide the matching Git source tag, its recursive submodules and build instructions
 alongside the binary, preserving upstream and third-party notices. The feature patch is an additional
 review aid, not a replacement for the full corresponding source.
 
@@ -73,8 +72,10 @@ Installation and any account login are performed manually by the user.
 
 Nullgram Blue (`NullgramIcon`) is the default. All 15 upstream launcher options remain available,
 including their original selection behavior. Three supplied Nullgram artwork variants (Blue, Mint, Black) are included,
-for 19 total choices including the optional portrait icon.
-The portrait photograph is copyrighted by its provider. This version restores the 768x768 portrait icon at the photograph provider’s request. The original photograph and production master are not published. No photo preview is included in README or release notes. See the in-app source notice and `TMessagesProj/src/main/assets/nullgram/AVATAR_COPYRIGHT.txt`.
+for 18 public standard choices. Local builds add the Peach icon and 768x768 portrait icon,
+whose photograph belongs to its provider. The local copyright notice is in
+`TMessagesProj/src/localPortrait/assets/nullgram/AVATAR_COPYRIGHT.txt`.
+See [version and branch settings](RELEASE_BRANCHES.md) for the four build configurations.
 The blue startup artwork exits when the first content layout is ready, with a maximum of 2 seconds. Select an icon in **Settings → Chat Settings → App Icon**.
 Upstream premium-only choices retain their original restrictions. No restricted Nagram-exclusive
 artwork is added. Application display name and installation package are unchanged.

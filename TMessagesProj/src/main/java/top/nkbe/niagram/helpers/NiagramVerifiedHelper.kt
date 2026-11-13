@@ -24,7 +24,7 @@ object NiagramVerifiedHelper {
 
     private val NIAGRAM_DEVELOPERS = longArrayOf(
         6424286140L, // 空一格 K
-        8554837612L  // HSSkyBoy
+        8554837612L  // Nk-Be
     )
 
     private val NIAGRAM_OFFICIAL_CHATS = longArrayOf(

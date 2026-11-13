@@ -8,6 +8,8 @@
 
 package org.telegram.ui.Cells;
 
+import top.nkbe.niagram.helpers.LocalNameHelper;
+
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.PorterDuff;
@@ -257,7 +259,7 @@ public class ManageChatUserCell extends FrameLayout {
                     }
                 }
                 if (!continueUpdate && currentName == null && lastName != null && (mask & MessagesController.UPDATE_MASK_NAME) != 0) {
-                    newName = UserObject.getUserName(currentUser);
+                    newName = LocalNameHelper.name(currentAccount, currentUser);
                     if (!newName.equals(lastName)) {
                         continueUpdate = true;
                     }
@@ -278,7 +280,7 @@ public class ManageChatUserCell extends FrameLayout {
                 lastName = null;
                 nameTextView.setText(currentName);
             } else {
-                lastName = newName == null ? UserObject.getUserName(currentUser) : newName;
+                lastName = newName == null ? LocalNameHelper.name(currentAccount, currentUser) : newName;
                 nameTextView.setText(Emoji.replaceEmoji(lastName, nameTextView.getPaint().getFontMetricsInt(), false));
             }
             if (currentStatus != null) {
@@ -327,7 +329,7 @@ public class ManageChatUserCell extends FrameLayout {
                     }
                 }
                 if (!continueUpdate && currentName == null && lastName != null && (mask & MessagesController.UPDATE_MASK_NAME) != 0) {
-                    newName = currentChat.title;
+                    newName = LocalNameHelper.name(currentAccount, currentChat);
                     if (!newName.equals(lastName)) {
                         continueUpdate = true;
                     }
@@ -343,7 +345,7 @@ public class ManageChatUserCell extends FrameLayout {
                 lastName = null;
                 nameTextView.setText(currentName);
             } else {
-                lastName = newName == null ? currentChat.title : newName;
+                lastName = newName == null ? LocalNameHelper.name(currentAccount, currentChat) : newName;
                 nameTextView.setText(lastName);
             }
             if (currentStatus != null) {

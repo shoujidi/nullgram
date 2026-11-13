@@ -10,6 +10,8 @@ import java.util.Set;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Collections;
+import java.util.NavigableSet;
+import java.util.TreeSet;
 
 public final class KeywordReminderEngine {
     public static final int MAX_KEYWORDS = 100;
@@ -25,7 +27,11 @@ public final class KeywordReminderEngine {
         default List<WatchedPerson> watched(long owner) { return Collections.emptyList(); }
         default void watched(long owner, List<WatchedPerson> values) { }
         default Map<Long, Long> onlineAlerts(long owner) { return Collections.emptyMap(); }
-        default void onlineAlerts(long owner, Map<Long, Long> values) { }
+        boolean bannerEnabled(long owner);
+        void recordWatched(long owner, WatchedPersonRecord record, Set<String> seen, Map<Long, Long> onlineAlerts);
+        List<Integer> pendingPrivateReads(long owner, long dialogId);
+        void rememberPrivateReads(long owner, long dialogId, List<Integer> pending);
+        void recordPrivateRead(long owner, WatchedPersonRecord record, Set<String> seen, List<Integer> remaining);
         int account();
         long userId();
         long since();
@@ -41,8 +47,18 @@ public final class KeywordReminderEngine {
         long nowSeconds(int account);
     }
     public interface Events { void register(int account); void unregister(int account); }
-    public interface Tasks { void post(Runnable action); void cancel(Runnable action); }
-    public interface Publisher { boolean publish(Message message, int account, long userId); }
+    public interface Tasks {
+        default void post(Runnable action) { post(action, 0); }
+        void post(Runnable action, long delayMillis);
+        void cancel(Runnable action);
+    }
+    public interface Publisher {
+        boolean publish(Message message, int account, long userId);
+        default long watchedMessageDelayMillis(Message message, int account, long userId) { return 0; }
+        default void publishWatched(Message message, WatchedPersonRecord record, int account, long userId, boolean bannerEnabled) {
+            publish(message, account, userId);
+        }
+    }
     public interface Matcher { boolean matches(String text, List<String> keywords); }
 
     public static final class Message {
@@ -53,6 +69,7 @@ public final class KeywordReminderEngine {
         public final long senderId;
         public final int scope;
         public final boolean online;
+        public final int privateReadCount;
         public Message(long dialogId, int id, long date, String title, String text) {
             this(dialogId, id, date, title, text, 0);
         }
@@ -61,11 +78,28 @@ public final class KeywordReminderEngine {
         }
         public Message(long dialogId, int id, long date, String title, String text, long topicId,
                        long senderId, int scope, boolean online) {
+            this(dialogId, id, date, title, text, topicId, senderId, scope, online, 0);
+        }
+        private Message(long dialogId, int id, long date, String title, String text, long topicId,
+                        long senderId, int scope, boolean online, int privateReadCount) {
             this.dialogId = dialogId; this.id = id; this.date = date;
             this.title = title; this.text = text == null ? "" : text; this.topicId = topicId;
             this.senderId = senderId; this.scope = scope; this.online = online;
+            this.privateReadCount = privateReadCount;
         }
-        public String key() { return online ? "online:" + senderId + ":" + date : dialogId + ":" + id; }
+        public String key() {
+            if (online) return "online:" + senderId + ":" + date;
+            return (privateReadCount > 0 ? "read:" : "") + dialogId + ":" + id;
+        }
+    }
+
+    static final int MAX_TRACKED_PRIVATE_SENDS = 512;
+
+    private static final class PrivateReadProgress {
+        final LinkedHashSet<Integer> localIds = new LinkedHashSet<>();
+        final NavigableSet<Integer> confirmedIds = new TreeSet<>();
+        int readMax;
+        long observedAt;
     }
 
     private final Store store;
@@ -80,6 +114,8 @@ public final class KeywordReminderEngine {
     private List<String> keywords;
     private boolean enabled, keywordsEnabled;
     private List<WatchedPerson> watched = new ArrayList<>();
+    private final Map<Long, PrivateReadProgress> privateReads = new HashMap<>();
+    private final Set<Long> queuedPrivateReads = new HashSet<>();
     private final Map<Long, Long> statusBaseline = new HashMap<>();
     private Map<Long, Long> lastOnline = new HashMap<>();
     private final Set<Long> pendingOnline = new HashSet<>();
@@ -105,6 +141,7 @@ public final class KeywordReminderEngine {
     public List<WatchedPerson> activeWatched() { return new ArrayList<>(watched); }
     public void setKeywordsEnabled(boolean value) {
         store.keywordsEnabled(value); keywordsEnabled = value; invalidateTasks();
+        resumePrivateReads();
     }
     public void setWatched(long owner, List<WatchedPerson> values) {
         if (owner <= 0 || values.size() > MAX_WATCHED) throw new IllegalArgumentException("WATCHED_LIMIT");
@@ -115,6 +152,10 @@ public final class KeywordReminderEngine {
         if (owner == userId) {
             watched = new ArrayList<>(values); statusBaseline.clear(); invalidateTasks();
             lastOnline.keySet().retainAll(ids);
+            if (enabled) {
+                refreshPrivateReads();
+                resumePrivateReads();
+            }
         }
     }
     private void invalidateTasks() { version++; cancelPending(); }
@@ -141,7 +182,101 @@ public final class KeywordReminderEngine {
         long last = lastOnline.getOrDefault(personId, 0L);
         if (last != 0 && now - last < ONLINE_COOLDOWN_SECONDS) return;
         pendingOnline.add(personId);
-        enqueue(new Message(personId, 0, expires, name == null ? person.name : name, "", 0, personId, 0, true));
+        String displayName = name == null ? person.name : name;
+        enqueue(new Message(personId, 0, expires, displayName, "", 0, personId, 0, true), displayName);
+    }
+
+    private void refreshPrivateReads() {
+        Set<Long> active = new HashSet<>();
+        for (WatchedPerson person : watched) {
+            if (!person.privateRead) continue;
+            active.add(person.id);
+            privateReads.computeIfAbsent(person.id, id -> {
+                PrivateReadProgress progress = new PrivateReadProgress();
+                progress.confirmedIds.addAll(store.pendingPrivateReads(userId, id));
+                return progress;
+            });
+        }
+        privateReads.keySet().retainAll(active);
+    }
+
+    void onPrivateSend(long dialogId, int localId, long date) {
+        PrivateReadProgress progress = privateReads.get(dialogId);
+        if (progress == null || localId >= 0 || date < since) return;
+        progress.localIds.add(localId);
+        if (progress.localIds.size() > MAX_TRACKED_PRIVATE_SENDS) {
+            progress.localIds.remove(progress.localIds.iterator().next());
+        }
+    }
+
+    void onPrivateSendConfirmed(long dialogId, int localId, int serverId) {
+        PrivateReadProgress progress = privateReads.get(dialogId);
+        if (progress == null || serverId <= 0 || !progress.localIds.remove(localId) || !progress.confirmedIds.add(serverId)) return;
+        if (progress.confirmedIds.size() > MAX_TRACKED_PRIVATE_SENDS) progress.confirmedIds.pollFirst();
+        store.rememberPrivateReads(userId, dialogId, new ArrayList<>(progress.confirmedIds));
+        queuePrivateRead(dialogId, progress);
+    }
+
+    void onPrivateRead(long dialogId, int readMax) {
+        PrivateReadProgress progress = privateReads.get(dialogId);
+        if (progress == null) return;
+        if (readMax > progress.readMax) {
+            progress.readMax = readMax;
+            progress.observedAt = accounts.nowSeconds(account);
+        }
+        queuePrivateRead(dialogId, progress);
+    }
+
+    private void resumePrivateReads() {
+        privateReads.forEach(this::queuePrivateRead);
+    }
+
+    private void queuePrivateRead(long dialogId, PrivateReadProgress progress) {
+        if (!enabled || progress.confirmedIds.isEmpty() || progress.confirmedIds.first() > progress.readMax
+                || !queuedPrivateReads.add(dialogId)) return;
+        long token = version;
+        Runnable action = new Runnable() {
+            @Override public void run() {
+                if (!enabled || token != version) return;
+                pending.remove(this);
+                queuedPrivateReads.remove(dialogId);
+                if (!accounts.valid(account, userId)) { disable(); return; }
+                try {
+                    publishPrivateRead(dialogId, progress);
+                } catch (RuntimeException failure) {
+                    stopRuntime();
+                    try { store.enabled(false); } catch (RuntimeException ignored) { }
+                }
+            }
+        };
+        pending.add(action);
+        tasks.post(action);
+    }
+
+    private void publishPrivateRead(long dialogId, PrivateReadProgress progress) {
+        NavigableSet<Integer> covered = progress.confirmedIds.headSet(progress.readMax, true);
+        if (covered.isEmpty()) return;
+        for (WatchedPerson person : watched) {
+            if (person.id != dialogId) continue;
+            int lastId = covered.last();
+            int count = covered.size();
+            List<Integer> remaining = new ArrayList<>(progress.confirmedIds.tailSet(lastId, false));
+            Message message = new Message(dialogId, lastId, progress.observedAt, person.name, "", 0,
+                    dialogId, WatchedPerson.PRIVATE, false, count);
+            if (seen.contains(message.key())) {
+                store.rememberPrivateReads(userId, dialogId, remaining);
+                covered.clear();
+                return;
+            }
+            WatchedPersonRecord record = new WatchedPersonRecord(person.name, person.name, message.date,
+                    dialogId, lastId, 0, WatchedPerson.PRIVATE, count);
+            addSeen(message.key());
+            // Consume the tracked IDs in the same commit as the history entry.
+            store.recordPrivateRead(userId, record, seen, remaining);
+            covered.clear();
+            publisher.publishWatched(message, record, account, userId, store.bannerEnabled(userId));
+            return;
+        }
     }
 
     public void restore() {
@@ -168,6 +303,7 @@ public final class KeywordReminderEngine {
         account = selectedAccount; userId = selectedUserId; since = start;
         seen = new LinkedHashSet<>(store.seen(userId));
         watched = new ArrayList<>(store.watched(userId));
+        refreshPrivateReads();
         lastOnline = new HashMap<>(store.onlineAlerts(userId));
         Set<Long> ids = new HashSet<>();
         for (WatchedPerson person : watched) ids.add(person.id);
@@ -193,6 +329,7 @@ public final class KeywordReminderEngine {
         seen.clear();
         statusBaseline.clear();
         watched.clear();
+        privateReads.clear();
         lastOnline.clear();
     }
 
@@ -200,6 +337,7 @@ public final class KeywordReminderEngine {
         for (Runnable action : new ArrayList<>(pending)) tasks.cancel(action);
         pending.clear();
         pendingKeys.clear();
+        queuedPrivateReads.clear();
         pendingOnline.clear();
         presenceTasks.clear();
     }
@@ -217,6 +355,7 @@ public final class KeywordReminderEngine {
         version++;
         cancelPending();
         keywords = new ArrayList<>(normalized);
+        resumePrivateReads();
     }
 
     /** Disabled gate precedes matching, de-dup access and scheduling. */
@@ -225,16 +364,19 @@ public final class KeywordReminderEngine {
         if (sourceAccount != account || message == null || message.id == 0 || message.dialogId == 0) return;
         if (!accounts.valid(account, userId)) { disable(); return; }
         if (message.online || message.senderId == userId || message.date < since) return;
-        boolean watchedMatch = false;
+        String watchedName = null;
         for (WatchedPerson person : watched) {
-            if (person.id == message.senderId && (person.scopes & message.scope) != 0) { watchedMatch = true; break; }
+            if (person.id == message.senderId && (person.scopes & message.scope) != 0) {
+                watchedName = person.name;
+                break;
+            }
         }
-        if (!watchedMatch && (!keywordsEnabled || keywords.isEmpty() || message.text.isEmpty()
+        if (watchedName == null && (!keywordsEnabled || keywords.isEmpty() || message.text.isEmpty()
                 || !matcher.matches(message.text, keywords))) return;
-        enqueue(message);
+        enqueue(message, watchedName);
     }
 
-    private void enqueue(Message message) {
+    private void enqueue(Message message, String watchedName) {
         String key = message.key();
         if (seen.contains(key) || !pendingKeys.add(key)) {
             if (message.online) pendingOnline.remove(message.senderId);
@@ -253,14 +395,20 @@ public final class KeywordReminderEngine {
                 if (!accounts.valid(account, userId)) { disable(); return; }
                 if (seen.contains(key)) return;
                 try {
-                    if (publisher.publish(message, account, userId) && enabled && token == version) {
-                        seen.add(key);
-                        while (seen.size() > MAX_SEEN) seen.remove(seen.iterator().next());
-                        store.remember(userId, seen);
-                        if (message.online) {
-                            lastOnline.put(message.senderId, accounts.nowSeconds(account));
-                            store.onlineAlerts(userId, lastOnline);
+                    if (watchedName != null) {
+                        long date = message.online ? accounts.nowSeconds(account) : message.date;
+                        WatchedPersonRecord record = new WatchedPersonRecord(watchedName, message.title, date,
+                                message.dialogId, message.id, message.topicId, message.scope, message.privateReadCount);
+                        addSeen(key);
+                        if (message.online) lastOnline.put(message.senderId, date);
+                        // Commit the record and its de-duplication state together, even when alerts are muted.
+                        store.recordWatched(userId, record, seen, message.online ? lastOnline : null);
+                        if (enabled && token == version) {
+                            publisher.publishWatched(message, record, account, userId, store.bannerEnabled(userId));
                         }
+                    } else if (publisher.publish(message, account, userId) && enabled && token == version) {
+                        addSeen(key);
+                        store.remember(userId, seen);
                     }
                 } catch (RuntimeException failure) {
                     stopRuntime();
@@ -270,7 +418,13 @@ public final class KeywordReminderEngine {
         };
         pending.add(action);
         if (message.online) presenceTasks.add(action);
-        tasks.post(action);
+        long delay = watchedName == null ? 0 : publisher.watchedMessageDelayMillis(message, account, userId);
+        tasks.post(action, delay);
+    }
+
+    private void addSeen(String key) {
+        seen.add(key);
+        while (seen.size() > MAX_SEEN) seen.remove(seen.iterator().next());
     }
 
     public static String foldEnglish(String value) {

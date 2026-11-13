@@ -5,15 +5,34 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.MediaDataController;
+import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
 
 public class LauncherIconController {
     private static final LauncherIcon DEFAULT_ICON = LauncherIcon.NULLGRAM;
 
+    private static final String[] RETIRED_ALIASES = {"DisguiseMessages", "DisguiseContacts"};
+
     public static void tryFixLauncherIconIfNeeded() {
         Context context = ApplicationLoader.applicationContext;
+        PackageManager manager = context.getPackageManager();
+        for (String alias : RETIRED_ALIASES) {
+            if (manager.getComponentEnabledSetting(retiredAlias(context, alias))
+                    == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
+                setIcon(getOriginalIcon());
+                return;
+            }
+        }
+        for (LauncherIcon icon : LauncherIcon.values()) {
+            if (!icon.isAvailable() && manager.getComponentEnabledSetting(icon.getComponentName(context))
+                    == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
+                setIcon(getOriginalIcon());
+                return;
+            }
+        }
         // An explicit choice takes priority
         // over the newly enabled manifest default after an application update.
         for (LauncherIcon icon : LauncherIcon.values()) {
@@ -37,7 +56,12 @@ public class LauncherIconController {
         setIcon(DEFAULT_ICON);
     }
 
+    private static ComponentName retiredAlias(Context context, String key) {
+        return new ComponentName(context.getPackageName(), "org.telegram.messenger." + key);
+    }
+
     public static boolean isEnabled(LauncherIcon icon) {
+        if (!icon.isAvailable()) return false;
         Context ctx = ApplicationLoader.applicationContext;
         int i = ctx.getPackageManager().getComponentEnabledSetting(icon.getComponentName(ctx));
         return i == PackageManager.COMPONENT_ENABLED_STATE_ENABLED || i == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && icon == DEFAULT_ICON;
@@ -52,13 +76,41 @@ public class LauncherIconController {
         return DEFAULT_ICON;
     }
 
+    public static LauncherIcon getOriginalIcon() {
+        String key = MessagesController.getGlobalMainSettings()
+                .getString("nullgramOriginalIcon", DEFAULT_ICON.name());
+        for (LauncherIcon icon : LauncherIcon.values()) {
+            if (icon.name().equals(key) && !icon.isDisguise() && icon.isAvailable()) {
+                return icon;
+            }
+        }
+        return DEFAULT_ICON;
+    }
+
     public static void setIcon(LauncherIcon icon) {
+        if (!icon.isAvailable()) return;
+        if (!icon.isDisguise()) {
+            MessagesController.getGlobalMainSettings().edit()
+                    .putString("nullgramOriginalIcon", icon.name()).apply();
+        } else {
+            LauncherIcon current = getCurrentIcon();
+            if (!current.isDisguise()) {
+                MessagesController.getGlobalMainSettings().edit()
+                        .putString("nullgramOriginalIcon", current.name()).apply();
+            }
+        }
         Context ctx = ApplicationLoader.applicationContext;
         PackageManager pm = ctx.getPackageManager();
         pm.setComponentEnabledSetting(icon.getComponentName(ctx), PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP);
         for (LauncherIcon i : LauncherIcon.values()) {
             if (i != icon) {
                 pm.setComponentEnabledSetting(i.getComponentName(ctx), PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
+            }
+        }
+        for (String alias : RETIRED_ALIASES) {
+            ComponentName component = retiredAlias(ctx, alias);
+            if (pm.getComponentEnabledSetting(component) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
+                pm.setComponentEnabledSetting(component, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
             }
         }
         if (LaunchActivity.instance != null) {
@@ -90,7 +142,20 @@ public class LauncherIconController {
         NULLGRAM("NullgramIcon", R.drawable.nullgram_icon_background, R.drawable.nullgram_icon_foreground, R.string.NullgramIconDefault, R.mipmap.ic_launcher_nullgram),
         LIGHT("NullgramLightIcon", R.drawable.nullgram_icon_light_background, R.drawable.nullgram_icon_light_foreground, R.string.NullgramIconLight, R.mipmap.ic_launcher_nullgram_light),
         DARK("NullgramDarkIcon", R.drawable.nullgram_icon_dark_background, R.drawable.nullgram_icon_dark_foreground, R.string.NullgramIconDark, R.mipmap.ic_launcher_nullgram_dark),
-        PHOTO("NullgramPhotoIcon", R.drawable.nullgram_photo_background, R.drawable.nullgram_photo_foreground, R.string.NullgramIconPhoto, R.mipmap.ic_launcher_nullgram_photo);
+        PHOTO("NullgramPhotoIcon", R.drawable.nullgram_photo_background, R.drawable.nullgram_photo_foreground, R.string.NullgramIconPhoto, R.mipmap.ic_launcher_nullgram_photo),
+        PEACH("NullgramPeachIcon", R.drawable.nullgram_peach_background, R.drawable.nullgram_peach_foreground, R.string.NullgramIconPeach, R.mipmap.ic_launcher_nullgram_peach),
+        DISGUISE_QQ("DisguiseQQ", R.drawable.nullgram_disguise_qq, 0, R.string.NullgramDisguiseQQLabel, R.drawable.nullgram_disguise_qq),
+        DISGUISE_WECHAT("DisguiseWechat", R.drawable.nullgram_disguise_wechat, 0, R.string.NullgramDisguiseWechatLabel, R.drawable.nullgram_disguise_wechat),
+        DISGUISE_SHANDONGTONG("DisguiseShandongtong", R.drawable.nullgram_disguise_shandongtong, 0, R.string.NullgramDisguiseShandongtongLabel, R.drawable.nullgram_disguise_shandongtong);
+
+        public boolean isDisguise() {
+            return this == DISGUISE_QQ || this == DISGUISE_WECHAT || this == DISGUISE_SHANDONGTONG;
+        }
+
+        public boolean isAvailable() {
+            return (!isDisguise() || BuildConfig.NULLGRAM_DISGUISE)
+                    && ((this != PHOTO && this != PEACH) || BuildConfig.NULLGRAM_LOCAL_PORTRAIT);
+        }
 
         public final String key;
         public final int background;

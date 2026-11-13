@@ -47,6 +47,13 @@ public class MainTabsLayout extends AnimatedLinearLayout {
     private static final int[] PASS_PADDINGS_DP = {16, 8, 4};
 
     private int maxWidthPx;
+    private boolean qqAppearance;
+
+    public void setQqAppearance(boolean enabled) {
+        qqAppearance = enabled;
+        requestLayout();
+        invalidate();
+    }
 
     public void setMaxWidth(int maxWidthPx) {
         if (this.maxWidthPx != maxWidthPx) {
@@ -66,6 +73,24 @@ public class MainTabsLayout extends AnimatedLinearLayout {
         }
 
         final int maxTotalWidthForTabs = width - getPaddingLeft() - getPaddingRight();
+        if (qqAppearance) {
+            measureTabTexts(11);
+            int index = 0;
+            for (int a = 0; a < getChildCount(); a++) {
+                View child = getChildAt(a);
+                if (isViewVisible(child)) {
+                    int left = Math.round((float) maxTotalWidthForTabs * index / Math.max(1, visibleChildCount));
+                    int right = Math.round((float) maxTotalWidthForTabs * ++index / Math.max(1, visibleChildCount));
+                    tabsWidth[a] = right - left;
+                    tabsLeftPos[a] = left;
+                } else { tabsWidth[a] = tabsLeftPos[a] = 0; }
+                child.measure(MeasureSpec.makeMeasureSpec(tabsWidth[a], MeasureSpec.EXACTLY),
+                        MeasureSpec.makeMeasureSpec(tabHeight, MeasureSpec.EXACTLY));
+            }
+            setMeasuredDimension(width, height);
+            calculateTotalSizesAfterMeasure();
+            return;
+        }
         final int minTotalWidthForTabs = Math.min(dp(320), maxTotalWidthForTabs);
 
         int chosenPass = PASS_TEXT_SIZES_DP.length - 1;
@@ -309,7 +334,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
 
     @Override
     protected void dispatchDraw(@NonNull Canvas canvas) {
-        if (drawCustomSelector) {
+        if (drawCustomSelector && !qqAppearance) {
             final float x = animatedLongSelectedViewCenterX + animatedLongSelectedViewOffsetX;
             final float sWidth = getInterpolatedWidthByX(x, this);
             final float sHeight = getHeight() - getPaddingTop() - getPaddingBottom();
@@ -605,7 +630,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
-        clickHelper.onTouchEvent(this, ev);
+        if (!qqAppearance) clickHelper.onTouchEvent(this, ev);
         return super.dispatchTouchEvent(ev);
     }
 

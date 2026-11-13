@@ -3,8 +3,8 @@
 Nullgram is an independent modified Android client based on **Niagram** (formerly NiagramX):
 https://github.com/HSSkyBoy/Niagram
 
-Base revision: bc99e5e9907a2ea47d9e6ed432469b8ff553644f.
-Modification date: 2026-11-01. Modified distribution name: Nullgram.
+Base revision: c819d178d0fed124117558054cddbf64dc746cfa (Niagram 13.1.1, build 1311).
+Base update date: 2026-11-10. Modified distribution name: Nullgram.
 
 Niagram derives from NagramX, Nagram, Nekogram and Telegram Android. Their copyright notices,
 source history, licenses and third-party notices remain applicable and are preserved.
@@ -17,8 +17,8 @@ The default and all 15 upstream launcher choices retain their original Niagram a
 Nagram-exclusive restricted icon artwork is not copied into this distribution.
 Internal Java/Kotlin package names retain their upstream namespaces to avoid unrelated rewrites.
 
-Recipients of a binary receive the matching full source archive and build instructions alongside
-the APK. A patch alone is not the full source distribution. Local private keys and account
+Recipients of a binary receive the matching Git source tag and build instructions alongside
+the APK. Clone recursively to include the pinned submodules; GitHub automatic source ZIPs omit them. A patch alone is not the full source distribution. Local private keys and account
 credentials are excluded; recipients can build and sign their own APK with their own key.
 
 The installation package remains `top.nkbe.niagram`, including its original service configuration.

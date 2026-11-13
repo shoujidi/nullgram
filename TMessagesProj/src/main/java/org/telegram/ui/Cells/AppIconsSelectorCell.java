@@ -45,7 +45,6 @@ import org.telegram.ui.LauncherIconController;
 import org.telegram.ui.PremiumPreviewFragment;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class AppIconsSelectorCell extends RecyclerListView implements NotificationCenter.NotificationCenterDelegate {
@@ -149,7 +148,11 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
     @SuppressLint("NotifyDataSetChanged")
     private void updateIconsVisibility() {
         availableIcons.clear();
-        availableIcons.addAll(Arrays.asList(LauncherIconController.LauncherIcon.values()));
+        for (LauncherIconController.LauncherIcon icon : LauncherIconController.LauncherIcon.values()) {
+            if (icon.isAvailable() && !icon.isDisguise()) {
+                availableIcons.add(icon);
+            }
+        }
         if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
             for (int i = 0; i < availableIcons.size(); i++) {
                 if (availableIcons.get(i).premium) {

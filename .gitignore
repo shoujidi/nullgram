@@ -25,3 +25,11 @@ artifacts/
 backups/
 .private/
 .tools/
+# Disguise artwork is added separately on the disguise branch.
+/TMessagesProj/src/disguise/
+# Keep the private portrait and splash outside public source commits.
+/TMessagesProj/src/localPortrait/
+
+# Local heap dumps can contain account data and must never be published.
+*.hprof
+*.dmp

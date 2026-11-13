@@ -47,6 +47,8 @@ import org.jetbrains.annotations.NotNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.nullgram.client.permissions.VisualMediaAccess;
+
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.LocaleController;
@@ -104,6 +106,7 @@ public class PhotoAlbumPickerActivity extends BaseFragment implements Notificati
     private ArrayList<MediaController.AlbumEntry> albumsSorted = null;
 
     private boolean loading = false;
+    private int galleryAccess;
 
     private int columnsCount = 2;
     private RecyclerListView listView;
@@ -153,7 +156,10 @@ public class PhotoAlbumPickerActivity extends BaseFragment implements Notificati
 
     @Override
     public boolean onFragmentCreate() {
-        if (selectPhotoType == SELECT_TYPE_AVATAR || selectPhotoType == SELECT_TYPE_WALLPAPER || selectPhotoType == SELECT_TYPE_QR || !allowSearchImages) {
+        galleryAccess = VisualMediaAccess.current(ApplicationLoader.applicationContext);
+        if (!MediaController.hasCurrentGalleryAccess()) {
+            albumsSorted = null;
+        } else if (selectPhotoType == SELECT_TYPE_AVATAR || selectPhotoType == SELECT_TYPE_WALLPAPER || selectPhotoType == SELECT_TYPE_QR || !allowSearchImages) {
             albumsSorted = MediaController.allPhotoAlbums;
         } else {
             albumsSorted = MediaController.allMediaAlbums;
@@ -639,6 +645,13 @@ public class PhotoAlbumPickerActivity extends BaseFragment implements Notificati
     @Override
     public void onResume() {
         super.onResume();
+        int access = VisualMediaAccess.current(ApplicationLoader.applicationContext);
+        if (access != galleryAccess || (!loading && VisualMediaAccess.isLimited(access))) {
+            if (access != galleryAccess) albumsSorted = null;
+            galleryAccess = access;
+            loading = true;
+            MediaController.loadGalleryPhotosAlbums(classGuid);
+        }
         if (listAdapter != null) {
             listAdapter.notifyDataSetChanged();
         }
@@ -665,6 +678,7 @@ public class PhotoAlbumPickerActivity extends BaseFragment implements Notificati
         if (id == NotificationCenter.albumsDidLoad) {
             int guid = (Integer) args[0];
             if (classGuid == guid) {
+                galleryAccess = VisualMediaAccess.current(ApplicationLoader.applicationContext);
                 if (selectPhotoType == SELECT_TYPE_AVATAR || selectPhotoType == SELECT_TYPE_WALLPAPER || selectPhotoType == SELECT_TYPE_QR || !allowSearchImages) {
                     albumsSorted = (ArrayList<MediaController.AlbumEntry>) args[2];
                 } else {

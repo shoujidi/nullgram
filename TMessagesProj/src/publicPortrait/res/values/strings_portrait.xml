@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The old photo launcher alias can start the app and restore an available icon after an upgrade. -->
+    <item type="drawable" name="nullgram_photo_background">@drawable/nullgram_icon_background</item>
+    <item type="drawable" name="nullgram_photo_foreground">@drawable/nullgram_icon_foreground</item>
+    <item type="mipmap" name="ic_launcher_nullgram_photo">@mipmap/ic_launcher_nullgram</item>
+    <item type="mipmap" name="ic_launcher_nullgram_photo_round">@mipmap/ic_launcher_nullgram_round</item>
+    <string name="NullgramPortraitNotice">Nullgram</string>
+    <!-- Keep old launcher components resolvable without publishing private artwork. -->
+    <item type="drawable" name="nullgram_peach_background">@drawable/nullgram_icon_background</item>
+    <item type="drawable" name="nullgram_peach_foreground">@drawable/nullgram_icon_foreground</item>
+    <item type="mipmap" name="ic_launcher_nullgram_peach">@mipmap/ic_launcher_nullgram</item>
+</resources>

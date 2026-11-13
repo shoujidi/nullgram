@@ -27,6 +27,8 @@ import android.view.View;
 
 import androidx.core.content.FileProvider;
 
+import com.nullgram.client.permissions.VisualMediaAccess;
+
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BuildVars;
@@ -741,7 +743,9 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
             if (requestCode == 17) {
                 chatAttachAlert.getPhotoLayout().checkCamera(false);
                 chatAttachAlert.getPhotoLayout().checkStorage();
-            } else if (requestCode == BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE) {
+            } else if (requestCode == BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE
+                    || requestCode == BasePermissionsActivity.REQUEST_CODE_VISUAL_MEDIA
+                    || requestCode == BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE_FOR_AVATAR) {
                 chatAttachAlert.getPhotoLayout().checkStorage();
             }
         }
@@ -752,16 +756,10 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
             return;
         }
         final Activity activity = parentFragment.getParentActivity();
-        if (Build.VERSION.SDK_INT >= 33 && activity != null) {
-            if (activity.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED || activity.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED) {
-                activity.requestPermissions(new String[]{Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO}, BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE_FOR_AVATAR);
-                return;
-            }
-        } else if (Build.VERSION.SDK_INT >= 23 && activity != null) {
-            if (activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                activity.requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE_FOR_AVATAR);
-                return;
-            }
+        if (activity != null && !VisualMediaAccess.canRead(VisualMediaAccess.current(activity), true, canSelectVideo)) {
+            activity.requestPermissions(VisualMediaAccess.permissionsFor(true, canSelectVideo),
+                    BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE_FOR_AVATAR);
+            return;
         }
         PhotoAlbumPickerActivity fragment = new PhotoAlbumPickerActivity(canSelectVideo ? PhotoAlbumPickerActivity.SELECT_TYPE_AVATAR_VIDEO : PhotoAlbumPickerActivity.SELECT_TYPE_AVATAR, false, false, null);
         fragment.setAllowSearchImages(searchAvailable);

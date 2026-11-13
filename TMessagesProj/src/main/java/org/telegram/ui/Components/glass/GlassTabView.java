@@ -128,6 +128,25 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         }
     }
 
+    private com.nullgram.client.appearance.QqTabPainter qqPainter;
+    private boolean qqAppearance;
+    private int qqKind;
+    private String qqBadge;
+
+    public void setQqAppearance(boolean enabled, int kind) {
+        if (qqAppearance == enabled && qqKind == kind) return;
+        qqAppearance = enabled;
+        qqKind = kind;
+        setContentDescription(enabled ? com.nullgram.client.appearance.QqTabPainter.label(kind) : textView.getText());
+        if (enabled) {
+            if (qqPainter == null) qqPainter = new com.nullgram.client.appearance.QqTabPainter(getContext());
+            imageView.stopAnimation();
+        } else {
+            checkPlayAnimation(false);
+        }
+        invalidate();
+    }
+
     private static final RectF tmpRectF = new RectF();
 
     private boolean hasGestureSelectedOverride;
@@ -149,6 +168,11 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
 
     @Override
     protected void dispatchDraw(@NonNull Canvas canvas) {
+        if (qqAppearance) {
+            qqPainter.draw(canvas, hasVisualWidth ? visualWidth : getWidth(), getHeight(), qqKind,
+                    hasGestureSelectedOverride ? gestureSelectedOverride : isSelectedAnimator.getFloatValue(), qqBadge);
+            return;
+        }
         final float viewWidth = hasVisualWidth ? visualWidth : getWidth();
         final float selectedFactor = hasGestureSelectedOverride ? gestureSelectedOverride : isSelectedAnimator.getFloatValue();
         if (selectedFactor > 0 && !skipDrawSelector) {
@@ -221,6 +245,8 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
     private Drawable premiumStarDrawable;
 
     public void setCounter(String text, boolean isError, boolean animated) {
+        qqBadge = text;
+        if (qqAppearance) animated = false;
         counter.setText(text, animated);
         isHasCounterAnimator.setValue(!TextUtils.isEmpty(text), animated);
         isHasCounterErrorAnimator.setValue(isError, animated);
@@ -278,6 +304,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
     private long lastBotIconId;
 
     private void checkPlayAnimation(boolean animated) {
+        if (qqAppearance) return;
         final boolean isSelected = isSelectedAnimator.getValue();
 
         if (tabAnimationBot !=  null) {

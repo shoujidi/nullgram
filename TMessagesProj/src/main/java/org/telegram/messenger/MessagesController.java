@@ -144,17 +144,16 @@ import me.vkryl.core.BitwiseUtils;
 import top.nkbe.niagram.filters.AyuFilter;
 import top.nkbe.niagram.filters.ReactionFilter;
 import top.nkbe.niagram.helpers.ChatsHelper;
-import top.nkbe.niagram.helpers.LocalNameHelper;
 import top.nkbe.niagram.helpers.MessageHelper;
 import top.nkbe.niagram.utils.AlertUtil;
 import top.nkbe.niagram.config.NyaConfig;
 import xyz.nextalone.nagram.helper.LocalPremiumStatusHelper;
 
-import com.radolyn.ayugram.AyuConstants;
-import com.radolyn.ayugram.messages.AyuSavePreferences;
-import com.radolyn.ayugram.messages.AyuMessagesController;
-import com.radolyn.ayugram.utils.AyuState;
-import com.radolyn.ayugram.utils.LastSeenHelper;
+import top.nkbe.niagram.ayu.AyuConstants;
+import top.nkbe.niagram.ayu.messages.AyuSavePreferences;
+import top.nkbe.niagram.ayu.messages.AyuMessagesController;
+import top.nkbe.niagram.ayu.utils.AyuState;
+import top.nkbe.niagram.ayu.utils.LastSeenHelper;
 
 public class MessagesController extends BaseController implements NotificationCenter.NotificationCenterDelegate {
 
@@ -221,8 +220,6 @@ public class MessagesController extends BaseController implements NotificationCe
     public long giveawayBoostsPerPremium = 4;
     public long boostsPerSentGift = 3;
 
-    public static ConcurrentHashMap<Long, String> chatOverrideNameCache = new ConcurrentHashMap<>(); // custom chat name
-    public static ConcurrentHashMap<Long, String> userOverrideNameCache = new ConcurrentHashMap<>(); // custom user name
 
     public static TLRPC.Peer getPeerFromInputPeer(TLRPC.InputPeer peer) {
         if (peer.chat_id != 0) {
@@ -6620,6 +6617,10 @@ public class MessagesController extends BaseController implements NotificationCe
         loadingChannelAdmins.clear();
         users.clear();
         objectsByUsernames.clear();
+        // its cache points at users of the previous session
+        userNameResolver = null;
+        cachedIsUserContactBlocked.clear();
+        loadingIsUserContactBlocked.clear();
         chats.clear();
         dialogMessage.clear();
         deletedHistory.clear();
@@ -6939,20 +6940,6 @@ public class MessagesController extends BaseController implements NotificationCe
             oldUser.fromMessageId = user.fromMessageId;
         }
 
-        // user name override start
-        String overrideName = userOverrideNameCache.computeIfAbsent(user.id, k -> {
-            String fetchedName = LocalNameHelper.getUserNameOverride(k);
-            return (fetchedName != null) ? fetchedName : "";
-        });
-        if (!overrideName.isEmpty()) {
-            user.first_name = overrideName;
-            user.last_name = "";
-            if (oldUser != null) {
-                oldUser.first_name = overrideName;
-                oldUser.last_name = "";
-            }
-        }
-        // user name override end
 
         if (user.min) {
             if (oldUser != null) {
@@ -7089,20 +7076,6 @@ public class MessagesController extends BaseController implements NotificationCe
             oldChat.fromMessageId = chat.fromMessageId;
         }
 
-        // chat name override start
-        if (ChatObject.isChannel(chat)) {
-            String overrideName = chatOverrideNameCache.computeIfAbsent(chat.id, k -> {
-                String fetchedName = LocalNameHelper.getChatNameOverride(k);
-                return (fetchedName != null) ? fetchedName : "";
-            });
-            if (!overrideName.isEmpty()) {
-                chat.title = overrideName;
-                if (oldChat != null) {
-                    oldChat.title = overrideName;
-                }
-            }
-        }
-        // chat name override end
 
         if (chat.min) {
             if (oldChat != null) {
@@ -7547,6 +7520,8 @@ public class MessagesController extends BaseController implements NotificationCe
                 if (!arrayList.isEmpty()) {
                     processUpdateArray(arrayList, null, null, false, 0);
                 }
+                AndroidUtilities.runOnUIThread(() ->
+                        com.nullgram.client.keyword.KeywordReminderController.onServerDialogsLoaded(currentAccount, res.dialogs));
             }
         });
     }
@@ -7911,6 +7886,7 @@ public class MessagesController extends BaseController implements NotificationCe
                         }
                     }
                     fullUsers.put(user.id, userFull);
+                    final boolean contactBlockedChanged = syncUserContactBlocked(user.id, userFull);
                     getTranslateController().updateDialogFull(user.id);
                     StarsController.getInstance(currentAccount).invalidateProfileGifts(userFull);
                     loadingFullUsers.remove(user.id);
@@ -7931,6 +7907,9 @@ public class MessagesController extends BaseController implements NotificationCe
                         getNotificationCenter().postNotificationName(NotificationCenter.botInfoDidLoad, userFull.bot_info, classGuid);
                     }
                     getNotificationCenter().postNotificationName(NotificationCenter.userInfoDidLoad, user.id, userFull);
+                    if (contactBlockedChanged) {
+                        getNotificationCenter().postNotificationName(NotificationCenter.userIsPremiumBlockedUpadted);
+                    }
 
                     TLRPC.Dialog dialog = dialogs_dict.get(user.id);
                     if (dialog != null) {
@@ -13302,6 +13281,7 @@ public class MessagesController extends BaseController implements NotificationCe
 
             AndroidUtilities.runOnUIThread(() -> {
                 resetingDialogs = false;
+                com.nullgram.client.keyword.KeywordReminderController.onServerDialogsLoaded(currentAccount, dialogsRes.dialogs);
                 applyDialogsNotificationsSettings(dialogsRes.dialogs);
 
                 MediaDataController mediaDataController = getMediaDataController();
@@ -13617,6 +13597,10 @@ public class MessagesController extends BaseController implements NotificationCe
                         dialogsEndReached.put(folderId, false);
                         serverDialogsEndReached.put(folderId, false);
                     } else if (dialogsLoadOffset[UserConfig.i_dialogsLoadOffsetId] == Integer.MAX_VALUE) {
+                        // nothing to load, otherwise sortDialogs hides every new dialog of an empty account
+                        if (folderId == 0) {
+                            dialogsLoadedTillDate = Integer.MIN_VALUE;
+                        }
                         dialogsEndReached.put(folderId, true);
                         serverDialogsEndReached.put(folderId, true);
                     } else {
@@ -13858,6 +13842,9 @@ public class MessagesController extends BaseController implements NotificationCe
                     dialogsLoadedTillDate = Integer.MIN_VALUE;
                 }
                 if (loadType != DIALOGS_LOAD_TYPE_CACHE) {
+                    if (!fromCache) {
+                        com.nullgram.client.keyword.KeywordReminderController.onServerDialogsLoaded(currentAccount, dialogsRes.dialogs);
+                    }
                     applyDialogsNotificationsSettings(dialogsRes.dialogs);
                     getMediaDataController().loadDraftsIfNeed();
                 }
@@ -19541,8 +19528,11 @@ public class MessagesController extends BaseController implements NotificationCe
             } else if (baseUpdate instanceof TL_update.TL_updateChatParticipantDelete) {
                 TL_update.TL_updateChatParticipantDelete update = (TL_update.TL_updateChatParticipantDelete) baseUpdate;
                 getMessagesStorage().updateChatInfo(update.chat_id, update.user_id, 1, 0, update.version);
-            } else if (baseUpdate instanceof TL_update.TL_updateDcOptions || baseUpdate instanceof TL_update.TL_updateConfig) {
+            } else if (baseUpdate instanceof TL_update.TL_updateDcOptions) {
                 getConnectionsManager().updateDcSettings();
+            } else if (baseUpdate instanceof TL_update.TL_updateConfig) {
+                getConnectionsManager().updateDcSettings();
+                loadAppConfig(true);
             } else if (baseUpdate instanceof TL_update.TL_updateEncryption) {
                 getSecretChatHelper().processUpdateEncryption((TL_update.TL_updateEncryption) baseUpdate, usersDict);
             } else if (baseUpdate instanceof TL_update.TL_updatePeerBlocked) {
@@ -24715,6 +24705,24 @@ public class MessagesController extends BaseController implements NotificationCe
         AndroidUtilities.cancelRunOnUIThread(requestIsUserContactBlockedRunnable);
         AndroidUtilities.runOnUIThread(requestIsUserContactBlockedRunnable, 60);
         return null;
+    }
+
+    // the full user is fresher than a requirement cached earlier, e.g. after importing a no paid messages token
+    private boolean syncUserContactBlocked(long userId, TLRPC.UserFull userFull) {
+        final TL_account.RequirementToContact cached = cachedIsUserContactBlocked.get(userId);
+        if (cached == null) {
+            return false;
+        }
+        final TL_account.RequirementToContact r = UserObject.getRequirementToContact(userFull);
+        if (UserObject.eq(cached, r)) {
+            return false;
+        }
+        if (r == null) {
+            cachedIsUserContactBlocked.remove(userId);
+        } else {
+            cachedIsUserContactBlocked.put(userId, r);
+        }
+        return true;
     }
 
     public void invalidateUserPremiumBlocked(long userId, int classGuid) {

@@ -4197,6 +4197,14 @@ public class Theme {
             final ThemeInfo themeDarkBlue = themesDict.get("Night");
 
             String theme = preferences.getString("theme", null);
+            if ("Nullgram Disguise Jade".equals(theme) || "Nullgram Disguise Slate".equals(theme)) {
+                theme = preferences.getString("nullgramOriginalTheme", "Blue");
+                if (!themesDict.containsKey(theme)) {
+                    theme = "Blue";
+                }
+                preferences.edit().putString("theme", theme).remove("nullgramOriginalTheme").apply();
+                themeConfig.edit().putString("lastDayTheme", theme).apply();
+            }
             if ("NekoX".equals(theme)) {
                 theme = "Blue";
                 preferences.edit().putString("theme", theme).apply();

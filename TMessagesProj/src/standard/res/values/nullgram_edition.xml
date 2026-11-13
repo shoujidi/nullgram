@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Neutral resources keep previously selected launcher components launchable during an edition switch. -->
+    <item type="drawable" name="nullgram_disguise_qq">@mipmap/ic_launcher_nullgram</item>
+    <item type="drawable" name="nullgram_disguise_wechat">@mipmap/ic_launcher_nullgram</item>
+    <item type="drawable" name="nullgram_disguise_shandongtong">@mipmap/ic_launcher_nullgram</item>
+    <string name="NullgramDisguiseQQLabel">Nullgram</string>
+    <string name="NullgramDisguiseWechatLabel">Nullgram</string>
+    <string name="NullgramDisguiseShandongtongLabel">Nullgram</string>
+    <item type="drawable" name="nullgram_qq_tab_message_normal">@drawable/msg_add</item>
+    <item type="drawable" name="nullgram_qq_tab_message_selected">@drawable/msg_add</item>
+    <item type="drawable" name="nullgram_qq_tab_contacts_normal">@drawable/msg_add</item>
+    <item type="drawable" name="nullgram_qq_tab_contacts_selected">@drawable/msg_add</item>
+    <item type="drawable" name="nullgram_qq_tab_calls_normal">@drawable/msg_add</item>
+    <item type="drawable" name="nullgram_qq_tab_calls_selected">@drawable/msg_add</item>
+    <item type="drawable" name="nullgram_qq_tab_me_normal">@drawable/msg_add</item>
+    <item type="drawable" name="nullgram_qq_tab_me_selected">@drawable/msg_add</item>
+    <item type="drawable" name="nullgram_qq_add">@drawable/msg_add</item>
+    <item type="drawable" name="nullgram_qq_search">@drawable/outline_search_1_24</item>
+    <item type="drawable" name="nullgram_qq_chat_more">@drawable/ic_ab_other</item>
+    <item type="drawable" name="nullgram_qq_chat_call">@drawable/call</item>
+</resources>

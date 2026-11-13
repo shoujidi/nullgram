@@ -8,6 +8,8 @@
 
 package org.telegram.ui.Cells;
 
+import top.nkbe.niagram.helpers.LocalNameHelper;
+
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.LocaleController.getString;
 
@@ -569,9 +571,9 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
             }
             if (!continueUpdate && currentName == null && lastName != null && (mask & MessagesController.UPDATE_MASK_NAME) != 0) {
                 if (currentUser != null) {
-                    newName = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(UserObject.getUserName(currentUser)));
+                    newName = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(LocalNameHelper.name(currentAccount, currentUser)));
                 } else {
-                    newName = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(currentChat == null ? "" : currentChat.title));
+                    newName = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(LocalNameHelper.name(currentAccount, currentChat)));
                 }
                 if (!newName.equals(lastName)) {
                     continueUpdate = true;
@@ -659,9 +661,9 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
             nameTextView.setText(name);
         } else {
             if (currentUser != null) {
-                lastName = newName == null ? UserObject.getUserName(currentUser) : AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(newName));
+                lastName = newName == null ? LocalNameHelper.name(currentAccount, currentUser) : AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(newName));
             } else if (currentChat != null) {
-                lastName = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(newName == null ? currentChat.title : newName));
+                lastName = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(newName == null ? LocalNameHelper.name(currentAccount, currentChat) : newName));
             } else {
                 lastName = "";
             }

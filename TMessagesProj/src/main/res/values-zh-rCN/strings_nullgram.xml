@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="NullgramRepeatTitle">重复发送</string>
+    <string name="NullgramExistingRepeatDefaults">复读默认参数</string>
+    <string name="NullgramNewRepeatDefaults">长按发送默认参数</string>
+    <string name="NullgramRepeatDefaultsValue">%1$d 次 · %2$s 秒</string>
     <string name="NullgramRepeatCount">重复次数（次）</string>
     <string name="NullgramRepeatInterval">发送间隔（秒）</string>
     <string name="NullgramRepeatStart">开始发送</string>
@@ -35,7 +38,7 @@
     <string name="NullgramUpstreamChannel">Niagram 上游频道</string>
     <string name="NullgramUpstreamSource">Niagram 上游源码</string>
     <string name="NullgramLicense">GPLv3 许可证</string>
-    <string name="NullgramSourceNotice">Nullgram 基于 Niagram（原 NiagramX）修改，基底提交 bc99e5e9907a2ea47d9e6ed432469b8ff553644f，修改日期 2026-11-01。不是 Niagram、NagramX、Nagram、Nekogram 或 Telegram 的官方版本，与其无隶属或背书关系。保留上游及第三方版权和许可，源码按 GPLv3 提供。分发 APK 时同时提供匹配的完整源码和构建说明。为兼容保留安装包名，Nullgram 显示名标识本 Fork；图标保留原作品归属，另提供独立 Nullgram 图标。 此专属头像照片版权归提供照片的用户本人所有，保留所有权利。本地版使用768×768高清头像图标，版权说明不展示原始照片预览。</string>
+    <string name="NullgramSourceNotice">Nullgram 基于 Niagram（原 NiagramX）修改，基底为 13.1.1（1311），提交 c819d178d0fed124117558054cddbf64dc746cfa。不是 Niagram、NagramX、Nagram、Nekogram 或 Telegram 的官方版本，与其无隶属或背书关系。保留上游及第三方版权和许可，源码按 GPLv3 提供。分发 APK 时同时提供匹配的完整源码和构建说明。为兼容保留安装包名，Nullgram 显示名标识本 Fork；图标保留原作品归属，另提供独立 Nullgram 图标。</string>
     <string name="NullgramFontPreview">Nullgram 是基于 Telegram 的客户端。</string>
     <string name="NullgramCompatibleParser">兼容解析器</string>
     <string name="NullgramNiagramIconDefault">NiagramX</string>
@@ -48,7 +51,41 @@
     <string name="NullgramReminderChannel">频道发言提醒</string>
     <string name="NullgramReminderOnline">上线提醒</string>
     <string name="NullgramReminderOnlineText">观察到对方上线</string>
+    <string name="NullgramReminderPrivateRead">私聊已读提醒</string>
+    <string name="NullgramReminderReadSingle">已读你发来的一条消息</string>
+    <string name="NullgramReminderReadMultiple">已读你发来的 %1$d 条消息</string>
     <string name="NullgramReminderMedia">收到一条非文字消息，点击查看。</string>
     <string name="NullgramReminderPersonLimit">最多添加100位关注人，不能添加自己或重复人员。</string>
     <string name="NullgramReminderWatchInfo">特别关注名单属于当前页面账号，各项默认关闭。按用户ID识别人，不凭昵称、频道署名或转发来源判断。频道评论属于群组；频道帖子仅在明确提供个人发送者ID时提醒。上线提醒只使用可见状态，首次同步和重连不提醒，60秒内不重复提醒；隐私设置、网络及系统后台限制可能导致遗漏。</string>
+    <string name="NullgramWatchedHistory">特别关注记录</string>
+    <string name="NullgramWatchedHistoryEmpty">暂无特别关注记录</string>
+    <string name="NullgramWatchedClearHistory">清空特别关注记录</string>
+    <string name="NullgramWatchedClearHistoryConfirm">要清空当前账号的全部特别关注记录吗？</string>
+    <string name="NullgramWatchedBanner">特别关注应用内横幅</string>
+    <string name="NullgramWatchedHistoryInfo">本机保留最近 200 条特别关注记录，点击可打开对应的消息或聊天。当前账号在应用前台时可显示横幅，其他情况下使用系统通知。</string>
+    <string name="NullgramManageMediaAccess">管理可访问的照片和视频</string>
+    <string name="NullgramDisguise">伪装</string>
+    <string name="NullgramAliasSearch">搜索本地备注</string>
+    <string name="NullgramAliasSearchHint">仅在本机搜索当前账号的全部备注，不联网查询。点按打开聊天，长按恢复原名。私人备注请在此搜索；普通 Telegram 搜索仍可能向服务器发送查询词。</string>
+    <string name="NullgramAliasUnavailable">本机暂时无法打开此聊天，仍可长按备注恢复原名。</string>
+    <string name="NullgramDisguisePreset">组合预设</string>
+    <string name="NullgramDisguiseListTheme">聊天列表外观</string>
+    <string name="NullgramDisguiseChatTheme">聊天界面外观</string>
+    <string name="NullgramDisguiseListOriginal">原有外观</string>
+    <string name="NullgramDisguiseIcons">应用图标</string>
+    <string name="NullgramDisguiseDefault">恢复原外观</string>
+    <string name="NullgramDisguiseAlias">设置备注</string>
+    <string name="NullgramDisguiseImport">将旧备注迁入当前账号</string>
+    <string name="NullgramDisguiseImportConfirm">旧备注未区分账号。确认迁入当前账号？已有的备注优先保留。</string>
+    <string name="NullgramLocalAlias">本地备注</string>
+    <string name="NullgramLocalAliasHint">原名：%1$s\n仅在本机当前账号中显示。</string>
+    <string name="NullgramRestoreName">恢复原名</string>
+    <string name="NullgramDisguiseName">应用内名称</string>
+    <string name="NullgramDisguiseCustomName">自定义名称</string>
+    <string name="NullgramDisguiseAddToHome">添加到桌面</string>
+    <string name="NullgramDisguiseShortcutUnsupported">当前 Android 版本或桌面不支持添加此快捷方式。</string>
+    <string name="NullgramDisguiseShortcutFailed">桌面快捷方式更新失败，请通过「添加到桌面」重试。</string>
+    <string name="NullgramQqConnected">已连接</string>
+    <string name="NullgramQqTabMessages">消息</string>
+    <string name="NullgramQqTabMe">我的</string>
 </resources>

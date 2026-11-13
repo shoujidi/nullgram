@@ -83,10 +83,10 @@ import top.nkbe.niagram.filters.AyuFilter;
 import top.nkbe.niagram.helpers.AppRestartHelper;
 import top.nkbe.niagram.helpers.MessageHelper;
 import top.nkbe.niagram.config.NyaConfig;
-import com.radolyn.ayugram.AyuConstants;
-import com.radolyn.ayugram.messages.AyuMessagesController;
-import com.radolyn.ayugram.messages.AyuSavePreferences;
-import com.radolyn.ayugram.proprietary.AyuMessageUtils;
+import top.nkbe.niagram.ayu.AyuConstants;
+import top.nkbe.niagram.ayu.messages.AyuMessagesController;
+import top.nkbe.niagram.ayu.messages.AyuSavePreferences;
+import top.nkbe.niagram.ayu.proprietary.AyuMessageUtils;
 
 public class MessagesStorage extends BaseController {
 
@@ -18416,7 +18416,7 @@ public class MessagesStorage extends BaseController {
                         username = name.substring(usernamePos + 3);
                     }
                     int found = 0;
-                    int uid = cursor.intValue(3);
+                    long uid = cursor.longValue(3);
                     for (String q : search) {
                         if (name.startsWith(q) || name.contains(" " + q) || tName != null && (tName.startsWith(q) || tName.contains(" " + q))) {
                             found = 1;
@@ -18468,7 +18468,7 @@ public class MessagesStorage extends BaseController {
                     if (name.equals(tName)) {
                         tName = null;
                     }
-                    int chatId = cursor.intValue(2);
+                    long chatId = cursor.longValue(2);
                     for (String q : search) {
                         int found = 0;
                         if (name.startsWith(q) || name.contains(" " + q) || tName != null && (tName.startsWith(q) || tName.contains(" " + q))) {

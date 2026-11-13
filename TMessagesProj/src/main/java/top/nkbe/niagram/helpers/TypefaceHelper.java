@@ -229,6 +229,10 @@ public class TypefaceHelper {
                 title = self.first_name;
             }
         }
+        String disguiseName = com.nullgram.client.appearance.DisguiseSettingsActivity.getDisplayName();
+        if (disguiseName != null) {
+            title = disguiseName;
+        }
         var builder = new SpannableStringBuilder(title);
         builder.setSpan(new LeadingMarginSpan.Standard(dp(2), 0), 0, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         Typeface titleTypeface = NyaConfig.disableBoldFont.Bool() ? createTypeface(400, false) : (NyaConfig.typeface.Bool() && NyaConfig.forceFontWeightFallback.Bool() ? createTypeface(700, false) : createTypeface(600, false));

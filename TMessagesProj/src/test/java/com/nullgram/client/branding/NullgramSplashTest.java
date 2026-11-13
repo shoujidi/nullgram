@@ -6,6 +6,8 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Looper;
@@ -24,6 +26,7 @@ import org.robolectric.annotation.GraphicsMode;
 import org.robolectric.annotation.LooperMode;
 import org.robolectric.android.controller.ActivityController;
 import org.robolectric.util.ReflectionHelpers;
+import org.telegram.messenger.R;
 import org.telegram.messenger.UiTestEnvironment;
 
 import java.time.Duration;
@@ -56,28 +59,32 @@ public class NullgramSplashTest {
     }
 
     private NullgramSplash show() {
-        assertTrue(NullgramSplash.attach(activity, launcher(), null));
+        assertTrue(NullgramSplash.attach(activity));
         return (NullgramSplash) root.getChildAt(root.getChildCount() - 1);
     }
 
-    @Test public void realArtworkFramesDecodeAndDrawDifferentBlueFrames() {
-        NullgramSplash splash = show();
-        Bitmap atlas = ReflectionHelpers.getField(splash, "animation");
-        assertNotNull("Actual Android artwork decoder must succeed", atlas);
-        assertEquals(1760, atlas.getWidth());
-        assertEquals(3520, atlas.getHeight());
-        int[] ends = ReflectionHelpers.getField(splash, "frameEnds");
-        assertEquals(31, ends.length);
-        assertEquals(2000, ends[ends.length - 1]);
+    private Bitmap render(NullgramSplash splash) {
         splash.layout(0, 0, 300, 300);
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(350));
-        Bitmap first = Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888);
-        splash.draw(new Canvas(first));
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500));
-        Bitmap next = Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888);
-        splash.draw(new Canvas(next));
-        assertFalse("Animation must draw changing frames", first.sameAs(next));
-        assertTrue((next.getPixel(0, 0) & 255) > 240);
+        Bitmap bitmap = Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888);
+        splash.draw(new Canvas(bitmap));
+        return bitmap;
+    }
+
+    @Test public void singleLogoScalesWithoutForcingSoftwareRendering() {
+        NullgramSplash splash = show();
+        Drawable logo = ReflectionHelpers.getField(splash, "logo");
+        Bitmap artwork = ((BitmapDrawable) logo).getBitmap();
+        int expectedWidth = 880;
+        int backgroundColor = activity.getColor(R.color.nullgram_splash_background);
+        assertEquals(expectedWidth, artwork.getWidth());
+        assertTrue(artwork.getAllocationByteCount() <= expectedWidth * expectedWidth * 4);
+        assertEquals(View.LAYER_TYPE_NONE, splash.getLayerType());
+        Bitmap first = render(splash);
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(NullgramSplash.ENTER_MS));
+        Bitmap next = render(splash);
+        assertFalse("Logo must grow between frames", first.sameAs(next));
+        assertEquals(backgroundColor, next.getPixel(0, 0));
+        assertNotEquals(next.getPixel(0, 0), next.getPixel(150, 150));
     }
 
     @Test public void closesAtTwoSecondsAndLeavesExistingContent() {
@@ -88,21 +95,28 @@ public class NullgramSplashTest {
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1));
         assertNull(splash.getParent());
         assertEquals(originalChildren, root.getChildCount());
-        assertNull(ReflectionHelpers.getField(splash, "animation"));
+        assertNull(ReflectionHelpers.getField(splash, "logo"));
     }
 
-    @Test public void readyContentDismissesBeforeAnimationCompletes() {
+    @Test public void readyContentStillGetsAFirstFrameAndCanBeTouchedDuringFade() {
         NullgramSplash splash = show();
         View content = activity.findViewById(android.R.id.content);
         content.layout(0, 0, 300, 450);
         content.setVisibility(View.VISIBLE);
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(120));
         content.getViewTreeObserver().dispatchOnPreDraw();
-        assertNull(splash.getParent());
-        assertNull(ReflectionHelpers.getField(splash, "animation"));
+        assertSame(root, splash.getParent());
+        assertFalse(splash.isClickable());
         assertNull(ReflectionHelpers.getField(splash, "readyListener"));
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3));
+        Bitmap first = render(splash);
+        assertEquals(255, first.getPixel(0, 0) >>> 24);
+        assertNotEquals(first.getPixel(0, 0), first.getPixel(150, 150));
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(NullgramSplash.EXIT_MS / 2));
+        Bitmap fading = render(splash);
+        int alpha = fading.getPixel(0, 0) >>> 24;
+        assertTrue(alpha > 0 && alpha < 255);
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(NullgramSplash.EXIT_MS / 2));
         assertNull(splash.getParent());
+        assertNull(ReflectionHelpers.getField(splash, "logo"));
     }
 
     @Test public void contentWithoutLayoutKeepsAnimationUntilReady() {
@@ -112,35 +126,40 @@ public class NullgramSplashTest {
         content.layout(0, 0, 0, 0);
         content.getViewTreeObserver().dispatchOnPreDraw();
         assertSame(root, splash.getParent());
+        assertTrue(splash.isClickable());
         content.layout(0, 0, 300, 450);
         content.getViewTreeObserver().dispatchOnPreDraw();
+        render(splash);
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(NullgramSplash.EXIT_MS));
         assertNull(splash.getParent());
     }
 
     @Test public void notificationShareAndDeepLinkIntentsDoNotShowSplash() {
-        assertFalse(NullgramSplash.attach(activity, new Intent("com.tmessages.openchat"), null));
-        assertFalse(NullgramSplash.attach(activity, new Intent(Intent.ACTION_SEND), null));
-        assertFalse(NullgramSplash.attach(activity, new Intent(Intent.ACTION_VIEW,
+        assertFalse(NullgramSplash.isLauncherStart(new Intent("com.tmessages.openchat"), null));
+        assertFalse(NullgramSplash.isLauncherStart(new Intent(Intent.ACTION_SEND), null));
+        assertFalse(NullgramSplash.isLauncherStart(new Intent(Intent.ACTION_VIEW,
                 Uri.parse("tg://resolve?domain=test")), null));
-        assertFalse(NullgramSplash.attach(activity, launcher().setData(Uri.parse("tg://test")), null));
-        assertTrue(NullgramSplash.attach(activity, launcher(), null));
+        assertFalse(NullgramSplash.isLauncherStart(launcher().setData(Uri.parse("tg://test")), null));
+        assertTrue(NullgramSplash.isLauncherStart(launcher(), null));
     }
 
     @Test public void restoredActivityDoesNotReplayAndWarmStartDoesNotDuplicate() {
-        assertFalse(NullgramSplash.attach(activity, launcher(), new Bundle()));
+        assertFalse(NullgramSplash.isLauncherStart(launcher(), new Bundle()));
         show();
         int count = root.getChildCount();
-        assertFalse(NullgramSplash.attach(activity, launcher(), null));
+        assertFalse(NullgramSplash.attach(activity));
         assertEquals(count, root.getChildCount());
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));
-        assertFalse(NullgramSplash.attach(activity, launcher(), null));
+        assertFalse(NullgramSplash.attach(activity));
     }
 
     @Test public void backgroundingReleasesAnimationAndPendingCallback() {
         NullgramSplash splash = show();
+        render(splash);
         splash.onWindowVisibilityChanged(View.INVISIBLE);
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
         assertNull(splash.getParent());
-        assertNull(ReflectionHelpers.getField(splash, "animation"));
+        assertNull(ReflectionHelpers.getField(splash, "logo"));
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3));
         assertNull(splash.getParent());
     }
@@ -149,17 +168,14 @@ public class NullgramSplashTest {
         NullgramSplash splash = show();
         assertTrue(splash.performClick());
         assertNull(splash.getParent());
-        assertFalse(NullgramSplash.attach(activity, launcher(), null));
+        assertFalse(NullgramSplash.attach(activity));
     }
 
-    @Test public void decoderFailureUsesStaticLogoAndStillDismisses() {
-        NullgramSplash splash = show();
-        ReflectionHelpers.setField(splash, "animation", null);
-        splash.layout(0, 0, 300, 300);
-        Bitmap rendered = Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888);
-        splash.draw(new Canvas(rendered));
-        assertNotEquals(rendered.getPixel(0, 0), rendered.getPixel(100, 100));
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));
-        assertNull(splash.getParent());
+    @Test public void launcherDecisionSurvivesTheRoutingCodeClearingTheIntent() {
+        Intent intent = launcher();
+        boolean showSplash = NullgramSplash.isLauncherStart(intent, null);
+        intent.setAction(null);
+        assertFalse(NullgramSplash.isLauncherStart(intent, null));
+        assertTrue(showSplash && NullgramSplash.attach(activity));
     }
 }

@@ -3,6 +3,7 @@
 package com.nullgram.client;
 
 import android.content.Context;
+import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.browser.Browser;
@@ -13,8 +14,10 @@ import java.nio.charset.StandardCharsets;
 public final class NullgramAbout {
     private NullgramAbout() { }
     public static void show(Context context, Theme.ResourcesProvider theme) {
+        String notice = LocaleController.getString(R.string.NullgramSourceNotice);
+        if (BuildConfig.NULLGRAM_LOCAL_PORTRAIT) notice += "\n\n" + LocaleController.getString(R.string.NullgramPortraitNotice);
         new AlertDialog.Builder(context, theme).setTitle("Nullgram · GPLv3")
-                .setMessage(LocaleController.getString(R.string.NullgramSourceNotice))
+                .setMessage(notice)
                 .setPositiveButton(LocaleController.getString(R.string.OK), null)
                 .setNegativeButton(LocaleController.getString(R.string.NullgramUpstreamSource),
                         (dialog, which) -> Browser.openUrl(context, "https://github.com/HSSkyBoy/Niagram"))

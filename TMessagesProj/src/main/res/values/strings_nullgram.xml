@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="NullgramRepeatTitle">Repeat send</string>
+    <string name="NullgramExistingRepeatDefaults">Message repeat defaults</string>
+    <string name="NullgramNewRepeatDefaults">Long-press send defaults</string>
+    <string name="NullgramRepeatDefaultsValue">%1$d× · %2$s s</string>
     <string name="NullgramRepeatCount">Repetitions (times)</string>
     <string name="NullgramRepeatInterval">Interval (seconds)</string>
     <string name="NullgramRepeatStart">Start sending</string>
@@ -35,7 +38,7 @@
     <string name="NullgramUpstreamChannel">Niagram upstream channel</string>
     <string name="NullgramUpstreamSource">Niagram upstream source</string>
     <string name="NullgramLicense">GPLv3 license</string>
-    <string name="NullgramSourceNotice">Nullgram is independently modified from Niagram (formerly NiagramX), revision bc99e5e9907a2ea47d9e6ed432469b8ff553644f. Modified 2026-11-01. It is not an official release of Niagram, NagramX, Nagram, Nekogram or Telegram. Copyright and third-party notices are preserved. Source is licensed under GPLv3; matching complete source and build instructions accompany the APK distribution. The application ID is retained for compatibility; the Nullgram display name identifies this independent fork; launcher artwork retains its original attribution, with optional independent Nullgram icons. Copyright in the portrait photograph belongs to the user who supplied it. All rights reserved. This local edition uses a 768x768 high-resolution portrait icon. The original photograph is not displayed in these notices.</string>
+    <string name="NullgramSourceNotice">Nullgram is independently modified from Niagram (formerly NiagramX), 13.1.1 (1311), revision c819d178d0fed124117558054cddbf64dc746cfa. It is not an official release of Niagram, NagramX, Nagram, Nekogram or Telegram. Copyright and third-party notices are preserved. Source is licensed under GPLv3; matching complete source and build instructions accompany the APK distribution. The application ID is retained for compatibility; the Nullgram display name identifies this independent fork; launcher artwork retains its original attribution, with optional independent Nullgram icons.</string>
     <string name="NullgramFontPreview">Nullgram is a Telegram client mod.</string>
     <string name="NullgramCompatibleParser">Compatibility parser</string>
     <string name="NullgramNiagramIconDefault">NiagramX</string>
@@ -48,7 +51,42 @@
     <string name="NullgramReminderChannel">Channel messages</string>
     <string name="NullgramReminderOnline">Online alerts</string>
     <string name="NullgramReminderOnlineText">Observed online</string>
+    <string name="NullgramReminderPrivateRead">Private chat read alerts</string>
+    <string name="NullgramIconPeach">桃</string>
+    <string name="NullgramReminderReadSingle">Read a message you sent</string>
+    <string name="NullgramReminderReadMultiple">Read %1$d messages you sent</string>
     <string name="NullgramReminderMedia">New media message. Tap to view.</string>
     <string name="NullgramReminderPersonLimit">Add up to 100 people. Duplicate entries and your own account are not allowed.</string>
     <string name="NullgramReminderWatchInfo">The watchlist belongs to this page’s account. New options are off by default. People are identified by user ID, never by names, channel signatures or forwarded authors. Channel comments count as group messages. Channel posts need an explicit personal sender ID. Online alerts use visible status only, skip initial/reconnect baselines and have a 60-second cooldown. Privacy, network and background restrictions can cause missed alerts.</string>
+    <string name="NullgramWatchedHistory">Watched person history</string>
+    <string name="NullgramWatchedHistoryEmpty">No watched person events yet</string>
+    <string name="NullgramWatchedClearHistory">Clear watched person history</string>
+    <string name="NullgramWatchedClearHistoryConfirm">Clear all watched person events for this account?</string>
+    <string name="NullgramWatchedBanner">In-app banner for watched people</string>
+    <string name="NullgramWatchedHistoryInfo">The most recent 200 watched person events are stored on this device. Tap a record to open the chat or message. Banners appear when this account is open in the app. System notifications are used when the banner is unavailable.</string>
+    <string name="NullgramManageMediaAccess">Manage selected photos and videos</string>
+    <string name="NullgramDisguise">Disguise</string>
+    <string name="NullgramAliasSearch">Search local aliases</string>
+    <string name="NullgramAliasSearchHint">Search all aliases for this account on this device, without network queries. Tap to open a chat; hold to restore its original name. Use this page for private aliases; ordinary Telegram search may send queries to the server.</string>
+    <string name="NullgramAliasUnavailable">This chat is not available locally. You can still hold its alias to restore the original name.</string>
+    <string name="NullgramDisguisePreset">Appearance presets</string>
+    <string name="NullgramDisguiseListTheme">Chat list appearance</string>
+    <string name="NullgramDisguiseChatTheme">Conversation appearance</string>
+    <string name="NullgramDisguiseListOriginal">Original appearance</string>
+    <string name="NullgramDisguiseIcons">App icons</string>
+    <string name="NullgramDisguiseDefault">Restore original</string>
+    <string name="NullgramDisguiseAlias">Set local aliases</string>
+    <string name="NullgramDisguiseImport">Move previous aliases to this account</string>
+    <string name="NullgramDisguiseImportConfirm">Previous aliases did not belong to a specific account. Move them to the current account? Existing aliases in this account take priority.</string>
+    <string name="NullgramLocalAlias">Local alias</string>
+    <string name="NullgramLocalAliasHint">Original name: %1$s\nOnly displayed locally for this account.</string>
+    <string name="NullgramRestoreName">Restore name</string>
+    <string name="NullgramDisguiseName">In-app name</string>
+    <string name="NullgramDisguiseCustomName">Custom name</string>
+    <string name="NullgramDisguiseAddToHome">Add to Home screen</string>
+    <string name="NullgramDisguiseShortcutUnsupported">This Android version or launcher cannot pin the shortcut.</string>
+    <string name="NullgramDisguiseShortcutFailed">Could not update the Home screen shortcut. Use Add to Home screen to try again.</string>
+    <string name="NullgramQqConnected">Connected</string>
+    <string name="NullgramQqTabMessages">Messages</string>
+    <string name="NullgramQqTabMe">Me</string>
 </resources>

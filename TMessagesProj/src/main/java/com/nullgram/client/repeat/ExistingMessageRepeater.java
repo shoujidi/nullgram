@@ -61,4 +61,8 @@ public final class ExistingMessageRepeater implements RepeatTaskManager.Sender {
     }
 
     @Override public String submissionError() { return sendError; }
+
+    public int messagesPerRound() {
+        return textSender != null || specialSticker ? 1 : messages.size();
+    }
 }

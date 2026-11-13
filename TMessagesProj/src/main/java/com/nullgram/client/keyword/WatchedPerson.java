@@ -7,10 +7,13 @@ public final class WatchedPerson {
     public final long id;
     public final String name;
     public final int scopes;
-    public final boolean online;
+    public final boolean online, privateRead;
     public WatchedPerson(long id, String name, int scopes, boolean online) {
+        this(id, name, scopes, online, false);
+    }
+    public WatchedPerson(long id, String name, int scopes, boolean online, boolean privateRead) {
         if (id <= 0 || name == null || name.length() > 256 || scopes < 0 || (scopes & ~ALL) != 0)
             throw new IllegalArgumentException("WATCHED_PERSON");
-        this.id = id; this.name = name; this.scopes = scopes; this.online = online;
+        this.id = id; this.name = name; this.scopes = scopes; this.online = online; this.privateRead = privateRead;
     }
 }

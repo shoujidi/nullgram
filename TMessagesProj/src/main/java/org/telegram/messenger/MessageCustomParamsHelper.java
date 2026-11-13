@@ -35,7 +35,8 @@ public class MessageCustomParamsHelper {
             message.translatedText == null &&
             message.translatedRichMessage == null &&
             message.errorAllowedPriceStars == 0 &&
-            message.errorNewPriceStars == 0
+            message.errorNewPriceStars == 0 &&
+            message.repeatDisplayDate == 0
         );
     }
 
@@ -54,6 +55,9 @@ public class MessageCustomParamsHelper {
         toMessage.translatedRichMessage = fromMessage.translatedRichMessage;
         toMessage.errorAllowedPriceStars = fromMessage.errorAllowedPriceStars;
         toMessage.errorNewPriceStars = fromMessage.errorNewPriceStars;
+        if (fromMessage.repeatDisplayDate != 0) {
+            toMessage.repeatDisplayDate = fromMessage.repeatDisplayDate;
+        }
         toMessage.translatedVoiceTranscription = fromMessage.translatedVoiceTranscription;
         toMessage.summarizedOpen = fromMessage.summarizedOpen;
         toMessage.summaryText = fromMessage.summaryText;
@@ -62,7 +66,7 @@ public class MessageCustomParamsHelper {
     }
 
 
-    public static void readLocalParams(TLRPC.Message message, NativeByteBuffer byteBuffer) {
+    public static void readLocalParams(TLRPC.Message message, InputSerializedData byteBuffer) {
         if (byteBuffer == null) {
             return;
         }
@@ -121,6 +125,7 @@ public class MessageCustomParamsHelper {
 
             flags = setFlag(flags, FLAG_13, message.translatedRichMessage != null);
             flags = setFlag(flags, FLAG_14, isCommentEncryptionPreparing(message));
+            flags = setFlag(flags, FLAG_15, message.repeatDisplayDate != 0);
         }
 
         @Override
@@ -172,6 +177,9 @@ public class MessageCustomParamsHelper {
             }
             if (hasFlag(flags, FLAG_13)) {
                 message.translatedRichMessage.serializeToStream(stream);
+            }
+            if (hasFlag(flags, FLAG_15)) {
+                stream.writeInt32(message.repeatDisplayDate);
             }
         }
 
@@ -227,6 +235,9 @@ public class MessageCustomParamsHelper {
             }
             if (hasFlag(flags, FLAG_13)) {
                 message.translatedRichMessage = TL_iv.RichMessage.TLdeserialize(stream, stream.readInt32(exception), exception);
+            }
+            if (hasFlag(flags, FLAG_15)) {
+                message.repeatDisplayDate = stream.readInt32(exception);
             }
         }
 

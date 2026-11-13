@@ -22,15 +22,19 @@ public final class KeywordSettingsView extends LinearLayout {
     private final KeywordReminderController controller;
     private final int account;
     private Runnable selectPerson;
+    private Runnable openHistory;
+    private final KeywordReminderStore store;
     private final Theme.ResourcesProvider theme;
     public KeywordSettingsView(Context context, Theme.ResourcesProvider theme, KeywordReminderController controller, int account) {
         super(context);
         this.controller = controller; this.account = account; this.theme = theme;
+        store = new KeywordReminderStore(context);
         setOrientation(VERTICAL);
         refresh();
     }
 
     public void setPersonPicker(Runnable picker) { selectPerson = picker; }
+    void setHistoryOpener(Runnable opener) { openHistory = opener; }
 
     public void refresh() {
         removeAllViews();
@@ -80,6 +84,26 @@ public final class KeywordSettingsView extends LinearLayout {
         addView(addPerson);
         addPerson.setOnClickListener(view -> { if (selectPerson != null) selectPerson.run(); });
         long owner = controller.accountUserId(account);
+        TextSettingsCell history = row(LocaleController.getString(R.string.NullgramWatchedHistory));
+        addView(history);
+        history.setOnClickListener(view -> { if (openHistory != null) openHistory.run(); });
+        TextCheckCell banner = new TextCheckCell(getContext(), theme);
+        banner.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite, theme));
+        banner.setTextAndCheck(LocaleController.getString(R.string.NullgramWatchedBanner), store.bannerEnabled(owner), true);
+        addView(banner);
+        banner.setOnClickListener(view -> {
+            if (owner <= 0 || owner != controller.accountUserId(account)) {
+                showError(R.string.NullgramKeywordLogin);
+                return;
+            }
+            try {
+                boolean enabled = !store.bannerEnabled(owner);
+                store.bannerEnabled(owner, enabled);
+                banner.setChecked(enabled);
+            } catch (IllegalStateException error) {
+                showError(R.string.NullgramKeywordSaveFailed);
+            }
+        });
         for (WatchedPerson person : engine.watched(owner)) {
             TextSettingsCell cell = row(person.name);
             StringBuilder detail = new StringBuilder();
@@ -93,20 +117,25 @@ public final class KeywordSettingsView extends LinearLayout {
                 if (detail.length() > 0) detail.append(" · ");
                 detail.append(LocaleController.getString(R.string.NullgramReminderOnline));
             }
+            if (person.privateRead) {
+                if (detail.length() > 0) detail.append(" · ");
+                detail.append(LocaleController.getString(R.string.NullgramReminderPrivateRead));
+            }
             cell.setTextAndValue(person.name, detail.toString(), true);
             addView(cell);
             cell.setOnClickListener(view -> editPerson(person));
         }
         TextInfoPrivacyCell watchInfo = new TextInfoPrivacyCell(getContext());
-        watchInfo.setText(LocaleController.getString(R.string.NullgramReminderWatchInfo));
+        watchInfo.setText(LocaleController.getString(R.string.NullgramReminderWatchInfo) + "\n"
+                + LocaleController.getString(R.string.NullgramWatchedHistoryInfo));
         addView(watchInfo);
     }
 
     public void editPerson(WatchedPerson person) {
         boolean[] options = {(person.scopes & WatchedPerson.PRIVATE) != 0,
-                (person.scopes & WatchedPerson.GROUP) != 0, (person.scopes & WatchedPerson.CHANNEL) != 0, person.online};
+                (person.scopes & WatchedPerson.GROUP) != 0, (person.scopes & WatchedPerson.CHANNEL) != 0, person.online, person.privateRead};
         int[] labels = {R.string.NullgramReminderPrivate, R.string.NullgramReminderGroup,
-                R.string.NullgramReminderChannel, R.string.NullgramReminderOnline};
+                R.string.NullgramReminderChannel, R.string.NullgramReminderOnline, R.string.NullgramReminderPrivateRead};
         LinearLayout content = new LinearLayout(getContext());
         content.setOrientation(VERTICAL);
         for (int i = 0; i < options.length; i++) {
@@ -123,7 +152,7 @@ public final class KeywordSettingsView extends LinearLayout {
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
             int scopes = (options[0] ? WatchedPerson.PRIVATE : 0) | (options[1] ? WatchedPerson.GROUP : 0)
                     | (options[2] ? WatchedPerson.CHANNEL : 0);
-            if (savePerson(person, new WatchedPerson(person.id, person.name, scopes, options[3]))) dialog.dismiss();
+            if (savePerson(person, new WatchedPerson(person.id, person.name, scopes, options[3], options[4]))) dialog.dismiss();
         }));
         dialog.show();
     }

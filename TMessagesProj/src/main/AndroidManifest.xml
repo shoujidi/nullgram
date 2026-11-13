@@ -41,6 +41,7 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"/>
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.WRITE_CONTACTS" />
@@ -102,6 +103,85 @@
         android:enableOnBackInvokedCallback="true"
     >
         <!-- usesCleartextTraffic for browser supporting opening http:// links -->
+
+        <activity-alias
+            android:enabled="false"
+            android:name="org.telegram.messenger.DisguiseQQ"
+            android:targetActivity="org.telegram.ui.LaunchActivity"
+            android:label="@string/nullgram_launcher_qq"
+            android:icon="@drawable/nullgram_disguise_qq"
+            android:roundIcon="@drawable/nullgram_disguise_qq"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+
+        <activity-alias
+            android:enabled="false"
+            android:name="org.telegram.messenger.DisguiseWechat"
+            android:targetActivity="org.telegram.ui.LaunchActivity"
+            android:label="@string/nullgram_launcher_wechat"
+            android:icon="@drawable/nullgram_disguise_wechat"
+            android:roundIcon="@drawable/nullgram_disguise_wechat"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+
+        <activity-alias
+            android:enabled="false"
+            android:name="org.telegram.messenger.DisguiseShandongtong"
+            android:targetActivity="org.telegram.ui.LaunchActivity"
+            android:label="@string/nullgram_launcher_shandongtong"
+            android:icon="@drawable/nullgram_disguise_shandongtong"
+            android:roundIcon="@drawable/nullgram_disguise_shandongtong"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+
+        <!-- Keeps upgrades launchable when a retired alias was explicitly enabled. -->
+        <activity-alias
+            android:enabled="false"
+            android:name="org.telegram.messenger.DisguiseContacts"
+            android:targetActivity="org.telegram.ui.LaunchActivity"
+            android:icon="@mipmap/ic_launcher_nullgram"
+            android:roundIcon="@mipmap/ic_launcher_nullgram_round"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+
+        <activity-alias
+            android:enabled="false"
+            android:name="org.telegram.messenger.DisguiseMessages"
+            android:targetActivity="org.telegram.ui.LaunchActivity"
+            android:icon="@mipmap/ic_launcher_nullgram"
+            android:roundIcon="@mipmap/ic_launcher_nullgram_round"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
 
         <activity-alias
             android:enabled="false"
@@ -407,9 +487,24 @@
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity-alias>
 
+        <activity-alias
+            android:enabled="false"
+            android:name="org.telegram.messenger.NullgramPeachIcon"
+            android:targetActivity="org.telegram.ui.LaunchActivity"
+            android:icon="@mipmap/ic_launcher_nullgram_peach"
+            android:roundIcon="@mipmap/ic_launcher_nullgram_peach"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+
 <activity
             android:name="org.telegram.ui.LaunchActivity"
-            android:theme="@style/Theme.TMessages.Start"
+            android:theme="${nullgramLaunchTheme}"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode|smallestScreenSize|screenLayout"
             android:supportsPictureInPicture="true"
             android:hardwareAccelerated="true"
@@ -791,14 +886,7 @@
 
         <receiver android:name=".WearReplyReceiver" android:enabled="true" android:exported="false"/>
 
-        <service
-            android:name=".WearAuthListenerService"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
-                <data android:scheme="wear" android:host="*" android:pathPrefix="/tg-wear-auth/" />
-            </intent-filter>
-        </service>
+        <!-- Wearable service disabled to remove play-services-wearable -->
 
         <receiver android:name=".StopLiveLocationReceiver" android:enabled="true" android:exported="false"/>
 

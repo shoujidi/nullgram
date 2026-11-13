@@ -144,6 +144,7 @@ import org.telegram.ui.Stories.recorder.DualCameraView;
 import org.telegram.ui.TON.TONIntroActivity;
 import org.telegram.ui.bots.BotBiometry;
 import org.telegram.ui.bots.BotDownloads;
+import org.telegram.ui.QrShare.QrShareActivity;
 import org.telegram.ui.bots.BotLocation;
 import org.telegram.ui.bots.BotWebViewSheet;
 import org.telegram.ui.bots.SetupEmojiStatusSheet;
@@ -159,7 +160,6 @@ import me.vkryl.android.animator.FactorAnimator;
 import top.nkbe.niagram.helpers.MainTabsHelper;
 import top.nkbe.niagram.helpers.MonetHelper;
 import top.nkbe.niagram.helpers.PasscodeHelper;
-import top.nkbe.niagram.helpers.remote.UpdateHelper;
 import top.nkbe.niagram.settings.NekoSettingsActivity;
 import top.nkbe.niagram.ui.BottomBuilder;
 import top.nkbe.niagram.utils.AndroidUtil;
@@ -248,6 +248,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             }
         };
         Bulletin.addDelegate(this, delegate);
+        if (listView.adapter != null) {
+            listView.adapter.notifyDataSetChanged();
+        }
     }
 
     @Override
@@ -329,14 +332,24 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         };
 
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        leftButtonIsBack = true; // the view may be rebuilt (theme, language): checkUi_menuItems swaps it to QR again
         actionBar.setAllowOverlayTitle(true);
         actionBar.setUseContainerForTitles();
         actionBar.setTitle(getString(R.string.Settings));
+        actionBar.setAdditionalTextLeft(-dp(4));
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
                 if (id == -1) {
-                    finishFragment();
+                    if (hasMainTabs) {
+                        // no back on the main tab: the left button opens the QR code (with the search open, the action bar closes it instead)
+                        final Bundle args = new Bundle();
+                        args.putLong("user_id", getUserConfig().getClientUserId());
+                        args.putBoolean(QrShareActivity.ARG_IMMEDIATE, true);
+                        presentFragment(new QrShareActivity(args));
+                    } else {
+                        finishFragment();
+                    }
                 } else if (id == 2) {
                     presentSettingFragment(new LogoutActivity());
                 }
@@ -654,6 +667,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             actionBarVisibleAnimator.start();
         }
     }
+
+
 
     private ArrayList<Integer> accountNumbers = new ArrayList<>();
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
@@ -1532,57 +1547,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             return Unit.INSTANCE;
         });
 
-        builder.addItem(getString(R.string.CheckUpdate), R.drawable.msg_search_solar, (it) -> {
-            Browser.openUrl(getContext(), "tg://update");
-            return Unit.INSTANCE;
-        });
-
-        String currentChannel = " - ";
-        switch (NyaConfig.INSTANCE.getAutoUpdateChannel().Int()) {
-            case UpdateHelper.UPDATE_OFF:
-                currentChannel += getString(R.string.AutoCheckUpdateOFF);
-                break;
-            case UpdateHelper.UPDATE_CHANNEL_RELEASE:
-                currentChannel += getString(R.string.AutoCheckUpdateRelease);
-                break;
-            case UpdateHelper.UPDATE_CHANNEL_BETA:
-                currentChannel += getString(R.string.AutoCheckUpdateBeta);
-                break;
-        }
-
-        builder.addItem(getString(R.string.AutoCheckUpdateSwitch) + currentChannel, R.drawable.sync_outline_28, (it) -> {
-            BottomBuilder switchBuilder = new BottomBuilder(getParentActivity());
-            switchBuilder.addTitle(getString(R.string.AutoCheckUpdateSwitch));
-            switchBuilder.addRadioItem(getString(R.string.AutoCheckUpdateOFF), NyaConfig.INSTANCE.getAutoUpdateChannel().Int() == UpdateHelper.UPDATE_OFF, (radioButtonCell) -> {
-                NyaConfig.INSTANCE.getAutoUpdateChannel().setConfigInt(UpdateHelper.UPDATE_OFF);
-                switchBuilder.doRadioCheck(radioButtonCell);
-                AndroidUtilities.runOnUIThread(() -> {
-                    switchBuilder.dismiss();
-                    UpdateHelper.cleanAppUpdate();
-                }, 500);
-                return Unit.INSTANCE;
-            });
-            switchBuilder.addRadioItem(getString(R.string.AutoCheckUpdateRelease), NyaConfig.INSTANCE.getAutoUpdateChannel().Int() == UpdateHelper.UPDATE_CHANNEL_RELEASE, (radioButtonCell) -> {
-                NyaConfig.INSTANCE.getAutoUpdateChannel().setConfigInt(UpdateHelper.UPDATE_CHANNEL_RELEASE);
-                switchBuilder.doRadioCheck(radioButtonCell);
-                AndroidUtilities.runOnUIThread(() -> {
-                    switchBuilder.dismiss();
-                    Browser.openUrl(getContext(), "tg://update");
-                }, 500);
-                return Unit.INSTANCE;
-            });
-            switchBuilder.addRadioItem(getString(R.string.AutoCheckUpdateBeta), NyaConfig.INSTANCE.getAutoUpdateChannel().Int() == UpdateHelper.UPDATE_CHANNEL_BETA, (radioButtonCell) -> {
-                NyaConfig.INSTANCE.getAutoUpdateChannel().setConfigInt(UpdateHelper.UPDATE_CHANNEL_BETA);
-                switchBuilder.doRadioCheck(radioButtonCell);
-                AndroidUtilities.runOnUIThread(() -> {
-                    switchBuilder.dismiss();
-                    Browser.openUrl(getContext(), "tg://update");
-                }, 500);
-                return Unit.INSTANCE;
-            });
-            showDialog(switchBuilder.create());
-            return Unit.INSTANCE;
-        });
         builder.show();
     }
 
@@ -1666,7 +1630,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 getMessagesStorage().clearSentMedia();
                 SharedConfig.setNoSoundHintShowed(false);
                 SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
-                editor.remove("archivehint").remove("proximityhint").remove("archivehint_l").remove("searchpostsnew").remove("speedhint").remove("gifhint").remove("reminderhint").remove("soundHint").remove("themehint").remove("bganimationhint").remove("filterhint").remove("n_0").remove("storyprvhint").remove("storyhint").remove("storyhint2").remove("storydualhint").remove("storysvddualhint").remove("stories_camera").remove("dualcam").remove("dualmatrix").remove("dual_available").remove("archivehint").remove("askNotificationsAfter").remove("askNotificationsDuration").remove("viewoncehint").remove("voicepausehint").remove("taptostorysoundhint").remove("nothanos").remove("voiceoncehint").remove("savedhint").remove("savedsearchhint").remove("savedsearchtaghint").remove("newppsms").remove("monetizationadshint").remove("seekSpeedHintShowed").remove("unsupport_video/av01").remove("statusgiftpage").remove("multistorieshint").remove("trimvoicehint").remove("taptostoryhighlighthint").remove("proxycheckstatusip").remove("callmiconstart").remove("showchattagsinfo").remove("language_showed3").remove("aihintshown").remove("savedmsgschatshint").apply();
+                editor.remove("archivehint").remove("proximityhint").remove("archivehint_l").remove("searchpostsnew").remove("speedhint").remove("gifhint").remove("reminderhint").remove("soundHint").remove("themehint").remove("bganimationhint").remove("filterhint").remove("n_0").remove("storyprvhint").remove("storyhint").remove("storyhint2").remove("storydualhint").remove("storysvddualhint").remove("stories_camera").remove("dualcam").remove("dualmatrix").remove("dual_available").remove("archivehint").remove("askNotificationsAfter").remove("askNotificationsDuration").remove("viewoncehint").remove("voicepausehint").remove("taptostorysoundhint").remove("nothanos").remove("voiceoncehint").remove("savedhint").remove("savedsearchhint").remove("savedsearchtaghint").remove("newppsms").remove("monetizationadshint").remove("seekSpeedHintShowed").remove("unsupport_video/av01").remove("statusgiftpage").remove("multistorieshint").remove("trimvoicehint").remove("taptostoryhighlighthint").remove("proxycheckstatusip").remove("callmiconstart").remove("showchattagsinfo").remove("language_showed3").remove("aihintshown").remove("savedmsgschatshint").remove("walletcardstickerhint").apply();
                 HintsController.resetAll();
                 SharedPrefsHelper.cleanupAccount(currentAccount);
                 MessagesController.getEmojiSettings(currentAccount).edit().remove("featured_hidden").remove("emoji_featured_hidden").commit();
@@ -2208,9 +2172,30 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
     }
 
+    private boolean leftButtonIsBack = true;
+
     private void checkUi_menuItems() {
-        FragmentFloatingButton.setAnimatedVisibility(otherItem, 1f - animatorSearchPageVisible.getFloatValue());
-        FragmentFloatingButton.setAnimatedVisibility(actionBar.getBackButton(), lerp(hasMainTabs ? 0f : 1f, 1f, animatorSearchPageVisible.getFloatValue()));
+        final float searchVisible = animatorSearchPageVisible.getFloatValue();
+        FragmentFloatingButton.setAnimatedVisibility(otherItem, 1f - searchVisible);
+        if (!hasMainTabs) {
+            FragmentFloatingButton.setAnimatedVisibility(actionBar.getBackButton(), 1f);
+            return;
+        }
+        // the main tab has no back: the left button is the QR code, turning into back while the search is open
+        // (shrinks away and grows back with the other icon; stays visible, so the title does not move)
+        final ImageView button = actionBar.getBackButton();
+        if (button == null) return;
+        final boolean back = searchVisible > 0.5f;
+        if (back != leftButtonIsBack) {
+            leftButtonIsBack = back;
+            button.setImageResource(back ? R.drawable.ic_ab_back : R.drawable.outline_header_qr_24);
+            button.setContentDescription(getString(back ? R.string.AccDescrGoBack : R.string.QrCode));
+        }
+        final float f = Math.abs(searchVisible * 2f - 1f);
+        button.setVisibility(View.VISIBLE);
+        button.setAlpha(f);
+        button.setScaleX(lerp(0.4f, 1f, f));
+        button.setScaleY(lerp(0.4f, 1f, f));
     }
 
 

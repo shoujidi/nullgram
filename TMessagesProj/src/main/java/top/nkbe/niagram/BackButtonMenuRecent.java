@@ -25,11 +25,14 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.ImageLocation;
+import org.telegram.messenger.ChatObject;
+import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.SerializedData;
+import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBarPopupWindow;
 import org.telegram.ui.ActionBar.AlertDialog;
@@ -38,6 +41,7 @@ import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
+import org.telegram.ui.Components.ItemOptions;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.TopicsFragment;
@@ -51,6 +55,118 @@ public class BackButtonMenuRecent {
 
     private static final SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekorecentdialogs", Context.MODE_PRIVATE);
     private static final SparseArray<LinkedList<Long>> recentDialogs = new SparseArray<>();
+
+
+    public static void addMenu(BaseFragment fragment, ItemOptions o) {
+        addMenu(fragment, o, null);
+    }
+
+    public static void addMenu(BaseFragment fragment, ItemOptions o, View anchor) {
+        if (fragment == null || o == null) return;
+        final int currentAccount = fragment.getCurrentAccount();
+        final LinkedList<Long> dialogs = getRecentDialogs(currentAccount);
+        if (dialogs.isEmpty()) {
+            return;
+        }
+        final Context context = fragment.getParentActivity();
+        if (context == null) return;
+
+        final java.util.ArrayList<TLObject> peers = new java.util.ArrayList<>();
+        for (Long dialogId : dialogs) {
+            if (dialogId == null) continue;
+            TLObject peer = fragment.getMessagesController().getUserOrChat(dialogId);
+            if (peer != null) {
+                peers.add(peer);
+            }
+        }
+        if (peers.isEmpty()) {
+            return;
+        }
+
+        boolean canSwipeback = false;
+        if (o.getLayout() instanceof ActionBarPopupWindow.ActionBarPopupWindowLayout) {
+            ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout = (ActionBarPopupWindow.ActionBarPopupWindowLayout) o.getLayout();
+            canSwipeback = popupLayout.getSwipeBack() != null;
+        }
+
+        if (!canSwipeback) {
+            o.add(R.drawable.menu_recent, getString(R.string.RecentChats), () -> {
+                o.dismiss();
+                show(currentAccount, fragment, anchor != null ? anchor : o.getLayout());
+            });
+            return;
+        }
+
+        final ItemOptions sub = o.makeSwipeback();
+        sub.add(R.drawable.ic_ab_back, getString(R.string.Back), o::closeSwipeback);
+        sub.addGap();
+
+        final ItemOptions chats = ItemOptions.swipeback((ActionBarPopupWindow.ActionBarPopupWindowLayout) o.getLayout(), fragment.getResourceProvider());
+        for (TLObject peer : peers) {
+            final long dialogId = DialogObject.getDialogId(peer);
+            chats.addChat(peer, false, () -> {
+                o.dismiss();
+                open(fragment, dialogId);
+            });
+            if (chats.getLastView() != null) {
+                chats.getLastView().setOnLongClickListener(v -> {
+                    o.dismiss();
+                    Bundle bundle = new Bundle();
+                    if (dialogId < 0) {
+                        bundle.putLong("chat_id", -dialogId);
+                    } else {
+                        bundle.putLong("user_id", dialogId);
+                    }
+                    fragment.presentFragment(new ProfileActivity(bundle));
+                    return true;
+                });
+            }
+        }
+
+        android.widget.ScrollView scrollView = new android.widget.ScrollView(o.getContext());
+        scrollView.setVerticalScrollBarEnabled(false);
+        scrollView.addView(chats.getLinearLayout());
+        sub.addView(scrollView, LayoutHelper.createLinear(240, LayoutHelper.WRAP_CONTENT, 1f));
+        sub.addGap();
+        sub.add(R.drawable.msg_clear, getString(R.string.ClearRecentChats), () -> {
+            new AlertDialog.Builder(context, fragment.getResourceProvider())
+                .setTitle(getString(R.string.ClearRecentChats))
+                .setMessage(getString(R.string.ClearRecentChatAlert))
+                .setPositiveButton(getString(R.string.ClearButton).toUpperCase(), (dialogInterface, i) -> {
+                    clearRecentDialogs(currentAccount);
+                    o.dismiss();
+                })
+                .setNegativeButton(getString(R.string.Cancel), null)
+                .makeRed(AlertDialog.BUTTON_POSITIVE)
+                .show();
+        });
+
+        o.add(R.drawable.menu_recent, getString(R.string.RecentChats), () -> o.openSwipeback(sub));
+    }
+
+    private static void open(BaseFragment fragment, long dialogId) {
+        if (fragment == null) return;
+        int currentAccount = fragment.getCurrentAccount();
+        MessagesController messagesController = fragment.getMessagesController();
+        TLRPC.Chat chat = messagesController.getChat(-dialogId);
+        if (chat != null && ChatObject.isForum(chat)) {
+            Bundle args = new Bundle();
+            args.putLong("chat_id", chat.id);
+            if (messagesController.isForum(dialogId)) {
+                fragment.presentFragment(new TopicsFragment(args));
+            } else {
+                fragment.presentFragment(new ChatActivity(args));
+            }
+        } else {
+            Bundle args = new Bundle();
+            if (dialogId < 0) {
+                args.putLong("chat_id", -dialogId);
+            } else {
+                args.putLong("user_id", dialogId);
+            }
+            fragment.presentFragment(new ChatActivity(args));
+        }
+    }
 
     public static void show(int currentAccount, BaseFragment fragment, View backButton) {
         if (fragment == null) {

@@ -69,6 +69,8 @@ import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+
+import com.nullgram.client.permissions.VisualMediaAccess;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.LinearSmoothScroller;
@@ -946,11 +948,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                         if (position == adapter.itemsCount - 2) {
                             menu.onItemClick(open_in); // NekoX: Use system photo picker
                         } else {
-                            if (Build.VERSION.SDK_INT >= 33) {
-                                fragment.getParentActivity().requestPermissions(new String[]{Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_IMAGES}, BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE);
-                            } else {
-                                fragment.getParentActivity().requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE);
-                            }
+                            requestGalleryPermission();
                         }
                     } catch (Exception ignore) {
 
@@ -1529,13 +1527,19 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
 
     private void requestGalleryPermission() {
-        try {
-            if (Build.VERSION.SDK_INT >= 33) {
-                parentAlert.baseFragment.getParentActivity().requestPermissions(new String[]{Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_IMAGES}, BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE);
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                parentAlert.baseFragment.getParentActivity().requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE);
+        Activity activity = AndroidUtilities.findActivity(getContext());
+        if (activity == null && parentAlert.baseFragment != null) {
+            activity = parentAlert.baseFragment.getParentActivity();
+        }
+        boolean videos = videoEnabled && shouldLoadAllMedia();
+        if (activity != null && mediaEnabled && (photoEnabled || videos)) {
+            try {
+                activity.requestPermissions(VisualMediaAccess.permissionsFor(photoEnabled, videos),
+                        BasePermissionsActivity.REQUEST_CODE_VISUAL_MEDIA);
+            } catch (RuntimeException error) {
+                FileLog.e(error);
             }
-        } catch (Exception ignore) {}
+        }
     }
 
     private void openCameraWithPermissionCheck() {
@@ -1901,7 +1905,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
     private void updateAlbumsDropDown() {
         dropDownContainer.removeAllSubItems();
-        if (mediaEnabled) {
+        boolean manageAccess = mediaEnabled && VisualMediaAccess.isLimited(VisualMediaAccess.current(getContext()));
+        if (mediaEnabled && !noGalleryPermissions && MediaController.hasCurrentGalleryAccess()) {
             ArrayList<MediaController.AlbumEntry> albums;
             if (shouldLoadAllMedia()) {
                 albums = MediaController.allMediaAlbums;
@@ -1929,10 +1934,17 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         } else {
             dropDownAlbums = new ArrayList<>();
         }
-        if (dropDownAlbums.isEmpty()) {
+        if (dropDownAlbums.isEmpty() && !manageAccess) {
             dropDown.setCompoundDrawablesWithIntrinsicBounds(null, null, null, null);
         } else {
             dropDown.setCompoundDrawablesWithIntrinsicBounds(null, null, dropDownDrawable, null);
+            if (manageAccess) {
+                dropDownContainer.addSubItem(0, R.drawable.msg_gallery, LocaleController.getString(R.string.NullgramManageMediaAccess))
+                        .setOnClickListener(v -> {
+                            dropDownContainer.toggleSubMenu();
+                            requestGalleryPermission();
+                        });
+            }
             for (int a = 0, N = dropDownAlbums.size(); a < N; a++) {
                 MediaController.AlbumEntry album = dropDownAlbums.get(a);
                 AlbumButton btn = new AlbumButton(getContext(), album.coverPhoto, album.bucketName, album.photos.size(), resourcesProvider);
@@ -2585,7 +2597,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         } else {
             albumEntry = MediaController.allPhotosAlbumEntry;
         }
-        if (albumEntry == null) {
+        if (albumEntry == null || !MediaController.hasCurrentGalleryAccess()) {
             MediaController.loadGalleryPhotosAlbums(0);
         }
     }
@@ -3219,29 +3231,26 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     }
 
     private boolean isNoGalleryPermissions() {
-        Activity activity = AndroidUtilities.findActivity(getContext());
-        if (activity == null) {
-            activity = parentAlert.baseFragment.getParentActivity();
-        }
-        return Build.VERSION.SDK_INT >= 23 && (
-            activity == null ||
-                Build.VERSION.SDK_INT >= 33 && (
-                    activity.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED ||
-                        activity.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED
-                ) ||
-                Build.VERSION.SDK_INT < 33 && activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
-        );
+        return !VisualMediaAccess.canRead(VisualMediaAccess.current(getContext()),
+                photoEnabled, videoEnabled && shouldLoadAllMedia());
     }
 
     public void checkStorage() {
-        if (noGalleryPermissions && Build.VERSION.SDK_INT >= 23) {
-            noGalleryPermissions = isNoGalleryPermissions();
+        boolean missing = isNoGalleryPermissions();
+        if (noGalleryPermissions != missing) {
+            noGalleryPermissions = missing;
             if (!noGalleryPermissions) {
                 loadGalleryPhotos();
             }
             adapter.notifyDataSetChanged();
             cameraAttachAdapter.notifyDataSetChanged();
         }
+        if (!MediaController.hasCurrentGalleryAccess() && selectedAlbumEntry != null) {
+            selectedAlbumEntry = null;
+            adapter.notifyDataSetChanged();
+            cameraAttachAdapter.notifyDataSetChanged();
+        }
+        updateAlbumsDropDown();
     }
 
     @Override
@@ -3667,6 +3676,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     @Override
     public void onResume() {
         if (parentAlert.isShowing() && !parentAlert.isDismissed() && !PhotoViewer.getInstance().isVisible()) {
+            checkStorage();
             checkCamera(false);
         }
     }
@@ -3756,6 +3766,9 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         }
         if (Build.VERSION.SDK_INT >= 23) {
             noGalleryPermissions = isNoGalleryPermissions();
+        }
+        if (!MediaController.hasCurrentGalleryAccess()) {
+            galleryAlbumEntry = null;
         }
         if (galleryAlbumEntry != null) {
             for (int a = 0; a < Math.min(100, galleryAlbumEntry.photos.size()); a++) {
@@ -4257,17 +4270,20 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     public void didReceivedNotification(int id, int account, Object... args) {
         if (id == NotificationCenter.albumsDidLoad) {
             if (adapter != null) {
+                noGalleryPermissions = isNoGalleryPermissions();
+                MediaController.AlbumEntry previousGallery = galleryAlbumEntry;
                 if (shouldLoadAllMedia()) {
                     galleryAlbumEntry = MediaController.allMediaAlbumEntry;
                 } else {
                     galleryAlbumEntry = MediaController.allPhotosAlbumEntry;
                 }
-                if (selectedAlbumEntry == null || parentAlert != null && parentAlert.isStickerMode) {
-                    selectedAlbumEntry = galleryAlbumEntry;
-                } else if (shouldLoadAllMedia()) {
-                    for (int a = 0; a < MediaController.allMediaAlbums.size(); a++) {
-                        MediaController.AlbumEntry entry = MediaController.allMediaAlbums.get(a);
-                        if (entry.bucketId == selectedAlbumEntry.bucketId && entry.videoOnly == selectedAlbumEntry.videoOnly) {
+                MediaController.AlbumEntry previousSelection = selectedAlbumEntry;
+                selectedAlbumEntry = galleryAlbumEntry;
+                if (previousSelection != null && (parentAlert == null || !parentAlert.isStickerMode)) {
+                    ArrayList<MediaController.AlbumEntry> albums = shouldLoadAllMedia()
+                            ? MediaController.allMediaAlbums : MediaController.allPhotoAlbums;
+                    for (MediaController.AlbumEntry entry : albums) {
+                        if (entry.bucketId == previousSelection.bucketId && entry.videoOnly == previousSelection.videoOnly) {
                             selectedAlbumEntry = entry;
                             break;
                         }
@@ -4277,20 +4293,28 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 progressView.showTextView();
                 adapter.notifyDataSetChanged();
                 cameraAttachAdapter.notifyDataSetChanged();
-                if (!selectedPhotosOrder.isEmpty() && galleryAlbumEntry != null) {
-                    for (int a = 0, N = selectedPhotosOrder.size(); a < N; a++) {
-                        Integer imageId = (Integer) selectedPhotosOrder.get(a);
+                boolean removedSelection = false;
+                if (!selectedPhotosOrder.isEmpty()) {
+                    for (int a = selectedPhotosOrder.size() - 1; a >= 0; a--) {
+                        Object key = selectedPhotosOrder.get(a);
+                        if (!(key instanceof Integer)) continue;
+                        Integer imageId = (Integer) key;
                         Object currentEntry = selectedPhotos.get(imageId);
-                        MediaController.PhotoEntry entry = galleryAlbumEntry.photosByIds.get(imageId);
+                        MediaController.PhotoEntry entry = galleryAlbumEntry == null ? null : galleryAlbumEntry.photosByIds.get(imageId);
                         if (entry != null) {
                             if (currentEntry instanceof MediaController.PhotoEntry) {
                                 MediaController.PhotoEntry photoEntry = (MediaController.PhotoEntry) currentEntry;
                                 entry.copyFrom(photoEntry);
                             }
                             selectedPhotos.put(imageId, entry);
+                        } else if (previousGallery != null && previousGallery.photosByIds.get(imageId) != null) {
+                            selectedPhotos.remove(imageId);
+                            selectedPhotosOrder.remove(a);
+                            removedSelection = true;
                         }
                     }
                 }
+                if (removedSelection) updatePhotosCounter(false);
                 updateAlbumsDropDown();
             }
         } else if (id == NotificationCenter.cameraInitied) {

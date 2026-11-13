@@ -15,6 +15,7 @@ import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MediaController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
@@ -31,6 +32,7 @@ public class BasePermissionsActivity extends FragmentActivity {
             REQUEST_CODE_OPEN_CAMERA = 20,
             REQUEST_CODE_VIDEO_MESSAGE = 150,
             REQUEST_CODE_EXTERNAL_STORAGE_FOR_AVATAR = 151,
+            REQUEST_CODE_VISUAL_MEDIA = 153,
             REQUEST_CODE_SIGN_IN_WITH_GOOGLE = 200,
             REQUEST_CODE_PAYMENT_FORM = 210,
             REQUEST_CODE_MEDIA_GEO = 211;
@@ -55,10 +57,12 @@ public class BasePermissionsActivity extends FragmentActivity {
             } else {
                 showPermissionErrorAlert(R.raw.permission_request_camera, LocaleController.getString(R.string.VoipNeedCameraPermission));
             }
-        } else if (requestCode == REQUEST_CODE_EXTERNAL_STORAGE || requestCode == REQUEST_CODE_EXTERNAL_STORAGE_FOR_AVATAR) {
+        } else if (requestCode == REQUEST_CODE_VISUAL_MEDIA || requestCode == REQUEST_CODE_EXTERNAL_STORAGE_FOR_AVATAR) {
+            // Visual access can be granted through the selected-media permission.
+            MediaController.refreshGalleryAccess();
+        } else if (requestCode == REQUEST_CODE_EXTERNAL_STORAGE) {
             if (!granted) {
-                showPermissionErrorAlert(R.raw.permission_request_folder, requestCode == REQUEST_CODE_EXTERNAL_STORAGE_FOR_AVATAR ? LocaleController.getString(R.string.PermissionNoStorageAvatar) :
-                        LocaleController.getString(R.string.PermissionStorageWithHint));
+                showPermissionErrorAlert(R.raw.permission_request_folder, LocaleController.getString(R.string.PermissionStorageWithHint));
             } else {
                 ImageLoader.getInstance().checkMediaPaths();
             }

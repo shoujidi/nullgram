@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The launcher cannot read Telegram's binary localization assets. Keep
+         these preset brand names in default Android resources for every locale. -->
+    <string name="nullgram_launcher_qq" translatable="false">QQ</string>
+    <string name="nullgram_launcher_wechat" translatable="false">微信</string>
+    <string name="nullgram_launcher_shandongtong" translatable="false">山东通</string>
+</resources>

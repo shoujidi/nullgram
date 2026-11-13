@@ -7,8 +7,8 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
@@ -24,35 +24,57 @@ public final class RepeatDialog {
     private RepeatDialog() {}
 
     public static AlertDialog create(Context context, Theme.ResourcesProvider theme, CharSequence preview,
-                                   int defaultCount, Start start) {
+                                     RepeatTask.Type type, Start start) {
+        return create(context, theme, preview, type, LocaleController.getString(R.string.NullgramRepeatTitle),
+                R.string.NullgramRepeatStart, start);
+    }
+
+    public static AlertDialog createDefaultsEditor(Context context, Theme.ResourcesProvider theme, RepeatTask.Type type,
+                                                    String title, Runnable onSaved) {
+        return create(context, theme, null, type, title, R.string.Save, (count, intervalMs) -> {
+            RepeatDefaults.set(type, count, intervalMs);
+            onSaved.run();
+            return true;
+        });
+    }
+
+    private static AlertDialog create(Context context, Theme.ResourcesProvider theme, CharSequence preview,
+                                      RepeatTask.Type type, String title, int positiveButton, Start start) {
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
         int padding = AndroidUtilities.dp(24);
-        content.setPadding(padding, 0, padding, padding);
-        TextView message = label(context, theme, preview == null ? "" : preview);
-        message.setMaxLines(3);
-        message.setEllipsize(TextUtils.TruncateAt.END);
-        content.addView(message);
-        content.addView(label(context, theme, LocaleController.getString(R.string.NullgramRepeatCount)));
-        EditTextBoldCursor count = input(context, theme, Integer.toString(defaultCount));
+        content.setPadding(padding, 0, padding, AndroidUtilities.dp(6));
+        if (!TextUtils.isEmpty(preview)) {
+            TextView message = label(context, theme, preview);
+            message.setSingleLine(true);
+            message.setEllipsize(TextUtils.TruncateAt.END);
+            content.addView(message);
+        }
+
+        EditTextBoldCursor count = input(context, theme, Integer.toString(RepeatDefaults.getCount(type)));
         count.setInputType(InputType.TYPE_CLASS_NUMBER);
-        content.addView(count);
-        content.addView(label(context, theme, LocaleController.getString(R.string.NullgramRepeatInterval)));
-        EditTextBoldCursor interval = input(context, theme, BigDecimal.valueOf(RepeatConfig.DEFAULT_INTERVAL_MS, 3).stripTrailingZeros().toPlainString());
+        EditTextBoldCursor interval = input(context, theme, RepeatConfig.formatSeconds(RepeatDefaults.getIntervalMs(type)));
         interval.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        content.addView(interval);
+        count.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+        interval.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        count.setNextFocusForwardId(interval.getId());
+
+        LinearLayout fields = new LinearLayout(context);
+        fields.setOrientation(LinearLayout.HORIZONTAL);
+        fields.setBaselineAligned(false);
+        addField(fields, theme, R.string.NullgramRepeatCount, count, AndroidUtilities.dp(12));
+        addField(fields, theme, R.string.NullgramRepeatInterval, interval, 0);
+        content.addView(fields);
         TextView error = label(context, theme, LocaleController.formatString(R.string.NullgramRepeatInvalid,
                 RepeatConfig.MIN_COUNT, RepeatConfig.MAX_COUNT,
-                BigDecimal.valueOf(RepeatConfig.MIN_INTERVAL_MS, 3).stripTrailingZeros().toPlainString(),
-                BigDecimal.valueOf(RepeatConfig.MAX_INTERVAL_MS, 3).stripTrailingZeros().toPlainString()));
+                RepeatConfig.formatSeconds(RepeatConfig.MIN_INTERVAL_MS), RepeatConfig.formatSeconds(RepeatConfig.MAX_INTERVAL_MS)));
         error.setTextColor(Theme.getColor(Theme.key_text_RedRegular, theme));
+        error.setVisibility(View.GONE);
         content.addView(error);
-        ScrollView scroll = new ScrollView(context);
-        scroll.addView(content);
         AlertDialog dialog = new AlertDialog.Builder(context, theme)
-                .setTitle(LocaleController.getString(R.string.NullgramRepeatTitle)).setView(scroll)
+                .setTitle(title).setView(content)
                 .setNegativeButton(LocaleController.getString(R.string.NullgramRepeatCancel), null)
-                .setPositiveButton(LocaleController.getString(R.string.NullgramRepeatStart), null).create();
+                .setPositiveButton(LocaleController.getString(positiveButton), null).create();
         dialog.setOnShowListener(ignored -> {
             Runnable validate = () -> {
                 boolean valid = values(count, interval) != null;
@@ -89,14 +111,31 @@ public final class RepeatDialog {
 
     private static EditTextBoldCursor input(Context context, Theme.ResourcesProvider theme, String value) {
         EditTextBoldCursor view = new EditTextBoldCursor(context);
+        view.setId(View.generateViewId());
         view.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, theme));
         view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         view.setBackground(Theme.createEditTextDrawable(context, true));
         view.setSingleLine(true);
         view.setText(value);
         view.setSelectAllOnFocus(true);
-        view.setPadding(0, AndroidUtilities.dp(8), 0, AndroidUtilities.dp(8));
+        view.setMinHeight(AndroidUtilities.dp(48));
+        view.setPadding(0, AndroidUtilities.dp(4), 0, AndroidUtilities.dp(4));
         return view;
+    }
+
+    private static void addField(LinearLayout row, Theme.ResourcesProvider theme, int labelId,
+                                 EditTextBoldCursor input, int endMargin) {
+        LinearLayout column = new LinearLayout(row.getContext());
+        column.setOrientation(LinearLayout.VERTICAL);
+        TextView caption = label(row.getContext(), theme, LocaleController.getString(labelId));
+        caption.setLabelFor(input.getId());
+        column.addView(caption);
+        column.addView(input, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        params.setMarginEnd(endMargin);
+        row.addView(column, params);
     }
 
     private static TextView label(Context context, Theme.ResourcesProvider theme, CharSequence text) {
@@ -104,7 +143,7 @@ public final class RepeatDialog {
         view.setText(text);
         view.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, theme));
         view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        view.setPadding(0, AndroidUtilities.dp(12), 0, AndroidUtilities.dp(4));
+        view.setPadding(0, AndroidUtilities.dp(4), 0, 0);
         return view;
     }
 }

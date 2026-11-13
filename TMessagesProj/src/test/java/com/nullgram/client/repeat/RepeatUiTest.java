@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 import static org.robolectric.Shadows.shadowOf;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,12 +18,19 @@ import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
+import org.robolectric.util.ReflectionHelpers;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MessageCustomParamsHelper;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UiTestEnvironment;
+import org.telegram.tgnet.SerializedData;
+import org.telegram.tgnet.TLObject;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.Components.EditTextBoldCursor;
+import top.nkbe.niagram.config.NyaConfig;
+import top.nkbe.niagram.settings.NekoSettingsActivity;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -57,7 +65,7 @@ public class RepeatUiTest {
 
     @Test public void cancelAndDismissNeverInvokeStart() {
         int[] calls = {0};
-        dialog = RepeatDialog.create(activity, null, "unsent draft", 5, (count, interval) -> {
+        dialog = RepeatDialog.create(activity, null, "unsent draft", RepeatTask.Type.NEW_MESSAGE, (count, interval) -> {
             calls[0]++;
             return true;
         });
@@ -71,9 +79,83 @@ public class RepeatUiTest {
         assertEquals(0, calls[0]);
     }
 
+    @Test public void settingsSaveSeparateCountsAndIntervalsAndPrefillSendingDialogs() {
+        var preferences = NyaConfig.getPreferences();
+        preferences.edit().putInt("NullgramExistingRepeatDefaultCount", 4)
+                .remove("NullgramNewRepeatDefaultCount")
+                .remove("NullgramExistingRepeatDefaultIntervalMs")
+                .remove("NullgramNewRepeatDefaultIntervalMs").apply();
+        class Settings extends NekoSettingsActivity {
+            @Override public Activity getParentActivity() { return activity; }
+            @Override public Dialog showDialog(Dialog value) {
+                dialog = (AlertDialog) value;
+                dialog.show();
+                return dialog;
+            }
+            void open(String rowField) {
+                updateRows();
+                listAdapter = createAdapter(activity);
+                onItemClick(null, ReflectionHelpers.<Integer>getField(this, rowField), 0f, 0f);
+                drainUi();
+            }
+        }
+        Settings settings = new Settings();
+        try {
+            settings.open("existingRepeatDefaultsRow");
+            List<EditTextBoldCursor> fields = inputs(dialog.getWindow().getDecorView());
+            EditTextBoldCursor count = fields.get(0);
+            EditTextBoldCursor interval = fields.get(1);
+            assertEquals("4", count.getText().toString());
+            assertEquals("3", interval.getText().toString());
+            count.setText("101");
+            assertFalse(dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled());
+            count.setText("7");
+            interval.setText("0.009");
+            assertFalse(dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled());
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+            assertTrue(dialog.isShowing());
+            assertEquals(4, RepeatDefaults.getCount(RepeatTask.Type.EXISTING));
+            assertEquals(3000L, RepeatDefaults.getIntervalMs(RepeatTask.Type.EXISTING));
+            interval.setText("1.75");
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+            assertEquals(7, RepeatDefaults.getCount(RepeatTask.Type.EXISTING));
+            assertEquals(1750L, RepeatDefaults.getIntervalMs(RepeatTask.Type.EXISTING));
+            assertFalse(dialog.isShowing());
+
+            settings.open("newRepeatDefaultsRow");
+            fields = inputs(dialog.getWindow().getDecorView());
+            count = fields.get(0);
+            interval = fields.get(1);
+            assertEquals("5", count.getText().toString());
+            assertEquals("3", interval.getText().toString());
+            count.setText("11");
+            interval.setText("0.01");
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+            assertEquals(1750L, RepeatDefaults.getIntervalMs(RepeatTask.Type.EXISTING));
+            assertEquals(10L, RepeatDefaults.getIntervalMs(RepeatTask.Type.NEW_MESSAGE));
+
+            List<Long> submitted = new ArrayList<>();
+            for (RepeatTask.Type type : RepeatTask.Type.values()) {
+                dialog = RepeatDialog.create(activity, null, "draft", type, (n, ms) -> {
+                    submitted.add((long) n);
+                    submitted.add(ms);
+                    return true;
+                });
+                dialog.show(); drainUi();
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+            }
+            assertEquals(java.util.Arrays.asList(7L, 1750L, 11L, 10L), submitted);
+        } finally {
+            preferences.edit().remove("NullgramExistingRepeatDefaultCount")
+                    .remove("NullgramNewRepeatDefaultCount")
+                    .remove("NullgramExistingRepeatDefaultIntervalMs")
+                    .remove("NullgramNewRepeatDefaultIntervalMs").apply();
+        }
+    }
+
     @Test public void invalidValuesDisableStartAndValidValuesPreserveMilliseconds() {
         List<Long> accepted = new ArrayList<>();
-        dialog = RepeatDialog.create(activity, null, "draft", 5, (count, interval) -> {
+        dialog = RepeatDialog.create(activity, null, "draft", RepeatTask.Type.NEW_MESSAGE, (count, interval) -> {
             accepted.add((long) count); accepted.add(interval); return true;
         });
         dialog.show(); drainUi();
@@ -95,7 +177,7 @@ public class RepeatUiTest {
 
     @Test public void minimumIntervalIsTenMillisecondsAndHasUnits() {
         List<Long> accepted = new ArrayList<>();
-        dialog = RepeatDialog.create(activity, null, "draft", 5, (count, interval) -> {
+        dialog = RepeatDialog.create(activity, null, "draft", RepeatTask.Type.NEW_MESSAGE, (count, interval) -> {
             accepted.add(interval); return true;
         });
         dialog.show(); drainUi();
@@ -131,9 +213,70 @@ public class RepeatUiTest {
         assertEquals(RepeatTaskState.CANCELLED, manager.getTaskState());
     }
 
+    @Test public void shortBatchSharesDisplayTimeAcrossSecondsButLeavesRealDatesAlone() {
+        List<TLRPC.Message> messages = new ArrayList<>();
+        int[] messagesPerRound = {1};
+        RepeatTaskManager.Sender sender = new RepeatTaskManager.Sender() {
+            @Override public String validate() { return null; }
+            @Override public List<Integer> send() {
+                return RepeatController.capture(0, 123, () -> {
+                    for (int i = 0; i < messagesPerRound[0]; i++) {
+                        TLRPC.Message message = new TLRPC.TL_message();
+                        message.id = -1 - messages.size();
+                        message.dialog_id = 123;
+                        message.date = 1700000000 + messages.size();
+                        RepeatController.onMessageCreated(0, message);
+                        messages.add(message);
+                    }
+                });
+            }
+        };
+        RepeatTaskManager.Sender shared = RepeatController.withSharedDisplayTime(5, 59, 1, sender);
+        for (int i = 0; i < 5; i++) shared.send();
+        assertEquals(5, messages.size());
+        for (int i = 0; i < 5; i++) {
+            assertEquals(1700000000, messages.get(i).repeatDisplayDate);
+            assertEquals(1700000000 + i, messages.get(i).date);
+        }
+
+        RepeatController.withSharedDisplayTime(5, 60, 1, sender).send();
+        RepeatController.withSharedDisplayTime(6, 59, 1, sender).send();
+        sender.send();
+        messagesPerRound[0] = 2;
+        RepeatController.withSharedDisplayTime(3, 59, 2, sender).send();
+        for (int i = 5; i < messages.size(); i++) assertEquals(0, messages.get(i).repeatDisplayDate);
+        int groupStart = messages.size();
+        RepeatTaskManager.Sender group = RepeatController.withSharedDisplayTime(2, 10, 2, sender);
+        group.send();
+        group.send();
+        assertEquals(groupStart + 4, messages.size());
+        for (int i = groupStart; i < messages.size(); i++) {
+            assertEquals(messages.get(groupStart).date, messages.get(i).repeatDisplayDate);
+        }
+    }
+
+    @Test public void sharedDisplayTimeSurvivesLocalParamsRoundTripWithoutReplacingServerDate() throws Exception {
+        TLRPC.Message sent = new TLRPC.TL_message();
+        sent.repeatDisplayDate = 1700000000;
+        sent.date = 1700000001;
+        assertFalse(MessageCustomParamsHelper.isEmpty(sent));
+        var paramsClass = Class.forName("org.telegram.messenger.MessageCustomParamsHelper$Params_v1")
+                .asSubclass(TLObject.class);
+        TLObject params = ReflectionHelpers.callConstructor(paramsClass,
+                ReflectionHelpers.ClassParameter.from(TLRPC.Message.class, sent));
+        SerializedData output = new SerializedData();
+        params.serializeToStream(output);
+
+        TLRPC.Message restored = new TLRPC.TL_message();
+        restored.date = sent.date;
+        MessageCustomParamsHelper.readLocalParams(restored, new SerializedData(output.toByteArray()));
+        assertEquals(1700000000, restored.repeatDisplayDate);
+        assertEquals(1700000001, restored.date);
+    }
+
     @Test public void rejectedStartKeepsDialogAndAllowsRetry() {
         int[] calls = {0};
-        dialog = RepeatDialog.create(activity, null, "draft", 1, (count, interval) -> ++calls[0] == 2);
+        dialog = RepeatDialog.create(activity, null, "draft", RepeatTask.Type.EXISTING, (count, interval) -> ++calls[0] == 2);
         dialog.show(); drainUi();
         View start = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
         start.performClick();

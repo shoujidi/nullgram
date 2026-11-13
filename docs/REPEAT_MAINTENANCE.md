@@ -1,6 +1,6 @@
 # NiagramX 两项重复发送功能
 
-基底：HSSkyBoy/NiagramX（现名 HSSkyBoy/Niagram），提交 bc99e5e9907a2ea47d9e6ed432469b8ff553644f。
+基底：HSSkyBoy/NiagramX（现名 HSSkyBoy/Niagram），提交 c819d178d0fed124117558054cddbf64dc746cfa。
 applicationId 保持 top.nkbe.niagram，名称、图标、原设置、服务和生产依赖保持基底原样。
 
 已有消息：长按消息，使用原有复读或复读为副本入口，设置次数和秒数。

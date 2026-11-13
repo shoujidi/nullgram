@@ -24,7 +24,12 @@ import java.util.Map;
 public final class RepeatController implements NotificationCenter.NotificationCenterDelegate {
     private static final Map<Integer, RepeatController> INSTANCES = new HashMap<>();
     private static final ThreadLocal<Capture> CAPTURE = new ThreadLocal<>();
+    private static final ThreadLocal<DisplayBatch> DISPLAY_BATCH = new ThreadLocal<>();
     private final RepeatTaskManager manager;
+
+    private static final class DisplayBatch {
+        int firstDate;
+    }
 
     private RepeatController(int account) {
         manager = new RepeatTaskManager(account, new RepeatTaskManager.Scheduler() {
@@ -49,6 +54,31 @@ public final class RepeatController implements NotificationCenter.NotificationCe
         RepeatController controller = INSTANCES.get(account);
         if (controller == null) { controller = new RepeatController(account); INSTANCES.put(account, controller); }
         return controller.manager;
+    }
+
+    public static boolean startTask(int account, long dialogId, RepeatTask.Type type, int count, long intervalMs,
+                                    int messagesPerRound, RepeatTaskManager.Sender sender) {
+        return get(account).startTask(dialogId, type, count, intervalMs,
+                withSharedDisplayTime(count, intervalMs, messagesPerRound, sender));
+    }
+
+    static RepeatTaskManager.Sender withSharedDisplayTime(int count, long intervalMs, int messagesPerRound,
+                                                          RepeatTaskManager.Sender sender) {
+        if (sender == null || !RepeatConfig.isValid(count, intervalMs) || intervalMs >= 60 || messagesPerRound <= 0
+                || (long) count * messagesPerRound >= 6) return sender;
+        DisplayBatch batch = new DisplayBatch();
+        return new RepeatTaskManager.Sender() {
+            @Override public String validate() { return sender.validate(); }
+            @Override public String submissionError() { return sender.submissionError(); }
+            @Override public List<Integer> send() {
+                DISPLAY_BATCH.set(batch);
+                try {
+                    return sender.send();
+                } finally {
+                    DISPLAY_BATCH.remove();
+                }
+            }
+        };
     }
 
     public static void cancelAll() {
@@ -92,7 +122,14 @@ public final class RepeatController implements NotificationCenter.NotificationCe
     public static void onMessageCreated(int account, TLRPC.Message message) {
         Capture capture = CAPTURE.get();
         if (capture != null && account == capture.account && message.id < 0
-                && org.telegram.messenger.MessageObject.getDialogId(message) == capture.dialogId) capture.ids.add(message.id);
+                && org.telegram.messenger.MessageObject.getDialogId(message) == capture.dialogId) {
+            capture.ids.add(message.id);
+            DisplayBatch batch = DISPLAY_BATCH.get();
+            if (batch != null && message.date > 0) {
+                if (batch.firstDate == 0) batch.firstDate = message.date;
+                message.repeatDisplayDate = batch.firstDate;
+            }
+        }
     }
 
     /** 原始 RPC 限速原因在通知前交给管理器；不改变上游发送或重试逻辑。 */

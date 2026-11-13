@@ -1,0 +1,36 @@
+{
+  "source": "User supplied QQ Android 9.2.15 (11480) APK",
+  "scope": "QQ-inspired styling with native Telegram composer layout and behavior",
+  "originalColors": {
+    "chatBackground": "#F0F0F2",
+    "outgoingBubble": "#0099FF",
+    "incomingBubble": "#FFFFFF",
+    "toolbarIcons": "#1A1A1A"
+  },
+  "contrastAdaptations": {
+    "chatBackground": "#E8EBF0",
+    "outgoingBubble": "#0060BB",
+    "secondaryText": "#535D6B",
+    "serviceIcons": "#334155",
+    "serviceBackground": "#FFFFFF"
+  },
+  "nativeBehaviorPreserved": [
+    "message layout and media geometry",
+    "emoji, attachment, audio/video recording",
+    "send state, scheduling, paid send and long press",
+    "repeat task manager and unified stop"
+  ],
+  "QQArtworkCopyright": "Original QQ assets belong to their original rightsholders. No authorship claimed by Nullgram.",
+  "assets": [
+    {
+      "resource": "nullgram_qq_chat_more",
+      "source": "r/b/qui_chat_settings.png",
+      "sha256": "3d28b70f5143b68e6da008d9494219b68760da4adb33a63b38b83de2d0dad319"
+    },
+    {
+      "resource": "nullgram_qq_chat_call",
+      "source": "r/b/qui_phone.png",
+      "sha256": "ddfbec94a97cace7132a51ce111bf91c3bf4d8ed5b7ed28a706078c3674d02fc"
+    }
+  ]
+}

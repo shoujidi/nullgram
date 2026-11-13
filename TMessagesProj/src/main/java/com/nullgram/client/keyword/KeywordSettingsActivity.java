@@ -39,6 +39,11 @@ public final class KeywordSettingsActivity extends BaseFragment {
         scroll.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, getResourceProvider()));
         settings = new KeywordSettingsView(context, getResourceProvider(), KeywordReminderController.get(), currentAccount);
         settings.setPersonPicker(this::pickPerson);
+        settings.setHistoryOpener(() -> {
+            WatchedPersonHistoryActivity history = new WatchedPersonHistoryActivity();
+            history.setCurrentAccount(currentAccount);
+            presentFragment(history);
+        });
         if (requestedPerson > 0) {
             org.telegram.tgnet.TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(requestedPerson);
             if (user != null && !user.bot && !user.deleted && !user.self) preparePerson(user);

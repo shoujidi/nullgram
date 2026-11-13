@@ -118,8 +118,30 @@ public class NullgramBrandingTest {
         org.telegram.ui.LauncherIconController.tryFixLauncherIconIfNeeded();
         assertEquals(org.telegram.ui.LauncherIconController.LauncherIcon.SPACE, org.telegram.ui.LauncherIconController.getCurrentIcon());
         assertEquals(android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, manager.getComponentEnabledSetting(legacy));
-        assertEquals(19, org.telegram.ui.LauncherIconController.LauncherIcon.values().length);
+        var choices = org.telegram.ui.LauncherIconController.LauncherIcon.values();
+        assertEquals(BuildConfig.NULLGRAM_LOCAL_PORTRAIT ? 20 : 18,
+                java.util.Arrays.stream(choices).filter(icon -> icon.isAvailable() && !icon.isDisguise()).count());
+        assertEquals(BuildConfig.NULLGRAM_DISGUISE ? 3 : 0,
+                java.util.Arrays.stream(choices).filter(icon -> icon.isAvailable() && icon.isDisguise()).count());
+        assertEquals("桃", context.getString(R.string.NullgramIconPeach));
+        org.telegram.ui.LauncherIconController.setIcon(org.telegram.ui.LauncherIconController.LauncherIcon.SPACE);
+        var disguiseIcon = org.telegram.ui.LauncherIconController.LauncherIcon.DISGUISE_QQ;
+        if (BuildConfig.NULLGRAM_DISGUISE) {
+            org.telegram.ui.LauncherIconController.setIcon(disguiseIcon);
+        } else {
+            manager.setComponentEnabledSetting(disguiseIcon.getComponentName(context),
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 1);
+            org.telegram.ui.LauncherIconController.tryFixLauncherIconIfNeeded();
+            assertEquals(android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    manager.getComponentEnabledSetting(disguiseIcon.getComponentName(context)));
+        }
+        assertEquals(org.telegram.ui.LauncherIconController.LauncherIcon.SPACE,
+                org.telegram.ui.LauncherIconController.getOriginalIcon());
+        org.telegram.ui.LauncherIconController.setIcon(org.telegram.ui.LauncherIconController.getOriginalIcon());
+        assertEquals(org.telegram.ui.LauncherIconController.LauncherIcon.SPACE,
+                org.telegram.ui.LauncherIconController.getCurrentIcon());
         for (org.telegram.ui.LauncherIconController.LauncherIcon icon : org.telegram.ui.LauncherIconController.LauncherIcon.values()) {
+            if (!icon.isAvailable()) continue;
             org.telegram.ui.LauncherIconController.setIcon(icon);
             assertEquals(icon, org.telegram.ui.LauncherIconController.getCurrentIcon());
             assertNotNull(context.getDrawable(icon.iconRes));
@@ -128,6 +150,37 @@ public class NullgramBrandingTest {
             }
         }
     }
+    @Test public void retiredDisguiseAliasRestoresThePreviousIconOnUpgrade() {
+        var context = ApplicationLoader.applicationContext;
+        var manager = context.getPackageManager();
+        var retired = new android.content.ComponentName(context.getPackageName(), "org.telegram.messenger.DisguiseMessages");
+        for (var icon : org.telegram.ui.LauncherIconController.LauncherIcon.values()) {
+            manager.setComponentEnabledSetting(icon.getComponentName(context), android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 1);
+        }
+        MessagesController.getGlobalMainSettings().edit().putString("nullgramOriginalIcon", "SPACE").apply();
+        manager.setComponentEnabledSetting(retired, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 1);
+
+        org.telegram.ui.LauncherIconController.tryFixLauncherIconIfNeeded();
+
+        assertEquals(org.telegram.ui.LauncherIconController.LauncherIcon.SPACE, org.telegram.ui.LauncherIconController.getCurrentIcon());
+        assertEquals(android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, manager.getComponentEnabledSetting(retired));
+    }
+
+    @Test public void privatePeachSelectionSafelyFallsBackInPublicBuild() {
+        var context = ApplicationLoader.applicationContext;
+        var manager = context.getPackageManager();
+        var peach = org.telegram.ui.LauncherIconController.LauncherIcon.PEACH;
+        for (var icon : org.telegram.ui.LauncherIconController.LauncherIcon.values()) {
+            manager.setComponentEnabledSetting(icon.getComponentName(context), android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 1);
+        }
+        MessagesController.getGlobalMainSettings().edit().putString("nullgramOriginalIcon", "PEACH").apply();
+        manager.setComponentEnabledSetting(peach.getComponentName(context), android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 1);
+        org.telegram.ui.LauncherIconController.tryFixLauncherIconIfNeeded();
+        var expected = BuildConfig.NULLGRAM_LOCAL_PORTRAIT ? peach : org.telegram.ui.LauncherIconController.LauncherIcon.NULLGRAM;
+        assertEquals(expected, org.telegram.ui.LauncherIconController.getCurrentIcon());
+        assertNotNull(context.getDrawable(peach.iconRes));
+    }
+
     @Test public void missingLauncherSelectionRepairsToBlueDefault() {
         android.content.Context context = ApplicationLoader.applicationContext;
         android.content.pm.PackageManager manager = context.getPackageManager();
@@ -154,9 +207,10 @@ public class NullgramBrandingTest {
         org.telegram.ui.LauncherIconController.LauncherIcon explicitChoice = org.telegram.ui.LauncherIconController.LauncherIcon.PHOTO;
         manager.setComponentEnabledSetting(explicitChoice.getComponentName(context), android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 1);
         org.telegram.ui.LauncherIconController.tryFixLauncherIconIfNeeded();
-        assertEquals(explicitChoice, org.telegram.ui.LauncherIconController.getCurrentIcon());
+        var expected = BuildConfig.NULLGRAM_LOCAL_PORTRAIT ? explicitChoice : org.telegram.ui.LauncherIconController.getOriginalIcon();
+        assertEquals(expected, org.telegram.ui.LauncherIconController.getCurrentIcon());
         for (org.telegram.ui.LauncherIconController.LauncherIcon icon : org.telegram.ui.LauncherIconController.LauncherIcon.values()) {
-            assertEquals(icon == explicitChoice, org.telegram.ui.LauncherIconController.isEnabled(icon));
+            assertEquals(icon == expected, org.telegram.ui.LauncherIconController.isEnabled(icon));
         }
     }
 
@@ -164,13 +218,24 @@ public class NullgramBrandingTest {
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     public void portraitIsHighResolutionArtworkWithCopyrightNotice() throws Exception {
         android.content.Context context = ApplicationLoader.applicationContext;
+        int portrait = context.getResources().getIdentifier("nullgram_exclusive_photo", "drawable", context.getPackageName());
+        if (!BuildConfig.NULLGRAM_LOCAL_PORTRAIT) {
+            assertEquals(0, portrait);
+            assertEquals(0, context.getResources().getIdentifier("nullgram_peach_art", "drawable", context.getPackageName()));
+            assertFalse(org.telegram.ui.LauncherIconController.LauncherIcon.PEACH.isAvailable());
+            assertEquals(0, context.getResources().getIdentifier("nullgram_exclusive_splash_portrait", "drawable", context.getPackageName()));
+            assertThrows(java.io.IOException.class, () -> context.getAssets().open("nullgram/AVATAR_COPYRIGHT.txt"));
+            assertFalse(BuildConfig.NULLGRAM_EXCLUSIVE_SPLASH);
+            return;
+        }
+        assertNotEquals(0, portrait);
         android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
-        android.graphics.BitmapFactory.decodeResource(context.getResources(), R.drawable.nullgram_exclusive_photo, bounds);
+        android.graphics.BitmapFactory.decodeResource(context.getResources(), portrait, bounds);
         assertEquals(768, bounds.outWidth);
         assertEquals(768, bounds.outHeight);
         assertEquals("image/png", bounds.outMimeType);
-        try (InputStream input = context.getResources().openRawResource(R.drawable.nullgram_exclusive_photo)) {
+        try (InputStream input = context.getResources().openRawResource(portrait)) {
             ByteArrayOutputStream data = new ByteArrayOutputStream();
             byte[] buffer = new byte[1024]; int count;
             while ((count = input.read(buffer)) != -1) data.write(buffer, 0, count);
@@ -186,7 +251,7 @@ public class NullgramBrandingTest {
         }
         for (Locale locale : new Locale[]{Locale.ENGLISH, Locale.SIMPLIFIED_CHINESE}) {
             ReflectionHelpers.setField(controller, "currentLocale", locale);
-            String sourceNotice = LocaleController.getString(R.string.NullgramSourceNotice);
+            String sourceNotice = LocaleController.getString(R.string.NullgramPortraitNotice);
             assertTrue(sourceNotice, sourceNotice.contains("768"));
             assertFalse(LocaleController.getString(R.string.NullgramIconPhoto).startsWith("LOC_ERR"));
         }

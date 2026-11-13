@@ -8,6 +8,8 @@
 
 package org.telegram.ui.Cells;
 
+import top.nkbe.niagram.helpers.LocalNameHelper;
+
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.LocaleController.getString;
 
@@ -522,13 +524,13 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
                     sb.setSpan(new FilterCreateActivity.TextSpan(getString(R.string.MonoforumSpan), 9.33f, Theme.key_windowBackgroundWhiteGrayText, resourcesProvider), index, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                     nameString = sb;
                 } else if (nameString == null) {
-                    nameString = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(chat.title));
+                    nameString = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(LocalNameHelper.name(currentAccount, chat)));
                 }
             } else if (nameString == null) {
-                nameString = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(chat.title));
+                nameString = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(LocalNameHelper.name(currentAccount, chat)));
             }
         } else if (nameString == null && user != null) {
-            nameString = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(UserObject.getUserName(user)));
+            nameString = AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(LocalNameHelper.name(currentAccount, user)));
         }
         nameString = AndroidUtilities.replaceNewLines(nameString);
         if (TextUtils.isEmpty(nameString)) {

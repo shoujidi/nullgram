@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Bundle;
 import java.time.Duration;
 import java.util.*;
 import org.junit.*;
@@ -17,12 +18,20 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.Implementation;
+import org.robolectric.annotation.Implements;
 import org.robolectric.annotation.LooperMode;
+import org.robolectric.shadows.ShadowActivity;
+import org.robolectric.util.ReflectionHelpers;
 import org.telegram.messenger.*;
+import org.telegram.messenger.support.LongSparseIntArray;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.AlertDialog;
+import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.Cells.TextSettingsCell;
+import org.telegram.ui.ChatActivity;
+import org.telegram.ui.LaunchActivity;
 import static org.junit.Assert.*;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -57,7 +66,7 @@ public class WatchedPersonReminderTest {
     static final class Jobs implements KeywordReminderEngine.Tasks {
         final Handler handler = new Handler(Looper.getMainLooper());
         final List<Runnable> submitted = new ArrayList<>();
-        public void post(Runnable r) { submitted.add(r); handler.post(r); }
+        public void post(Runnable r, long delayMillis) { submitted.add(r); handler.postDelayed(r, delayMillis); }
         public void cancel(Runnable r) { handler.removeCallbacks(r); }
     }
     private KeywordReminderController create() {
@@ -102,6 +111,30 @@ public class WatchedPersonReminderTest {
                 m.getDialogId(), new ArrayList<>(Collections.singletonList(m)), false, 0);
     }
     private void send(long dialog, int id, int scope, long sender, String text) { deliver(0, message(dialog,id,scope,sender,text)); }
+    private void watchPrivateReads(boolean enabled) {
+        controller.engine().setWatched(OWNER, Collections.singletonList(new WatchedPerson(PERSON, "Alice", 0, false, enabled)));
+    }
+    private void sendOutgoing(int account, long dialog, int localId, int scope) {
+        MessageObject outgoing = message(dialog, localId, scope, OWNER, "message body");
+        outgoing.messageOwner.out = true;
+        deliver(account, outgoing);
+    }
+    private void confirm(int account, long dialog, int localId, int serverId) {
+        NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.messageReceivedByServer,
+                localId, serverId, null, dialog, 0L, 0, false);
+    }
+    private void read(int account, long dialog, int maxId, boolean outbox) {
+        LongSparseIntArray progress = new LongSparseIntArray();
+        progress.put(dialog, maxId);
+        NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.messagesRead,
+                outbox ? null : progress, outbox ? progress : null);
+    }
+    private void serverSnapshot(int account, long dialog, int readMax) {
+        TLRPC.TL_dialog snapshot = new TLRPC.TL_dialog();
+        snapshot.id = dialog;
+        snapshot.read_outbox_max_id = readMax;
+        controller.acceptServerDialogs(account, Collections.singletonList(snapshot));
+    }
     private void status(long value) {
         accounts.status.put(PERSON, value);
         NotificationCenter.getInstance(0).postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_STATUS);
@@ -116,6 +149,175 @@ public class WatchedPersonReminderTest {
         controller.engine().setKeywords(Collections.singletonList("hello"));
         enable(); send(PERSON,1,1,PERSON,"Hello"); drain(); assertEquals(1,count());
     }
+    @Test public void historyRecordsWatchedEventsEvenWhenSystemNotificationsAreBlocked() {
+        notifications.createNotificationChannel(new NotificationChannel(KeywordNotificationPublisher.CHANNEL,
+                "Reminders", NotificationManager.IMPORTANCE_NONE));
+        controller.engine().setKeywords(Collections.singletonList("match"));
+        watch(WatchedPerson.ALL, true);
+        enable();
+        send(-20, 3, WatchedPerson.GROUP, PERSON, "match private body");
+        send(-20, 3, WatchedPerson.GROUP, PERSON, "match private body");
+        send(-20, 4, WatchedPerson.GROUP, 99, "match keyword only");
+        drain();
+        status(-1);
+        status(accounts.now + 60);
+
+        List<WatchedPersonRecord> records = new KeywordReminderStore(context).history(OWNER);
+        assertEquals(2, records.size());
+        assertEquals(0, count());
+        assertEquals(0, records.get(0).messageId);
+        assertEquals(accounts.now, records.get(0).date);
+        assertEquals("Person 42", records.get(0).name);
+        WatchedPersonRecord group = records.get(1);
+        assertEquals("Alice", group.name);
+        assertEquals("Chat -20", group.chatTitle);
+        assertEquals(WatchedPerson.GROUP, group.scope);
+        Intent destination = group.openIntent(context, 0, OWNER);
+        assertEquals(20, destination.getLongExtra("chatId", 0));
+        assertEquals(3, destination.getIntExtra("messageId", 0));
+        assertFalse(prefs.getString(KeywordReminderStore.historyKey(OWNER), "").contains("private body"));
+    }
+
+    @Test public void clearingHistoryPreservesSettingsAndDuplicateProtectionAfterRestart() {
+        watch(WatchedPerson.PRIVATE, false);
+        enable();
+        send(PERSON, 5, WatchedPerson.PRIVATE, PERSON, "hello");
+        drain();
+        controller.engine().shutdown();
+        controller = create();
+        controller.engine().restore();
+        KeywordReminderStore store = new KeywordReminderStore(context);
+        assertEquals(1, store.history(OWNER).size());
+        store.clearHistory(OWNER);
+        assertTrue(store.history(OWNER).isEmpty());
+        assertEquals(1, store.watched(OWNER).size());
+        send(PERSON, 5, WatchedPerson.PRIVATE, PERSON, "same event");
+        drain();
+        assertTrue(store.history(OWNER).isEmpty());
+        send(PERSON, 6, WatchedPerson.PRIVATE, PERSON, "new event");
+        drain();
+        assertEquals(6, store.history(OWNER).get(0).messageId);
+    }
+
+    @Test public void historyIsBoundedNewestFirstAndScopedToTheAccount() {
+        KeywordReminderStore store = new KeywordReminderStore(context);
+        for (int id = 1; id <= KeywordReminderStore.HISTORY_LIMIT + 1; id++) {
+            store.recordWatched(OWNER, new WatchedPersonRecord("Alice", "", accounts.now,
+                    PERSON, id, 0, WatchedPerson.PRIVATE), Collections.emptySet(), null);
+        }
+        store.recordWatched(600, new WatchedPersonRecord("Bob", "", accounts.now,
+                43, 1, 0, WatchedPerson.PRIVATE), Collections.emptySet(), null);
+        List<WatchedPersonRecord> history = store.history(OWNER);
+        assertEquals(KeywordReminderStore.HISTORY_LIMIT, history.size());
+        assertEquals(KeywordReminderStore.HISTORY_LIMIT + 1, history.get(0).messageId);
+        assertEquals(2, history.get(history.size() - 1).messageId);
+        assertEquals("Bob", store.history(600).get(0).name);
+        store.clearHistory(600);
+        assertTrue(store.history(600).isEmpty());
+        assertEquals(KeywordReminderStore.HISTORY_LIMIT, store.history(OWNER).size());
+    }
+
+    @Test public void enabledBannerFallsBackToSystemNotificationOutsideTheApp() {
+        KeywordReminderStore store = new KeywordReminderStore(context);
+        assertFalse(store.bannerEnabled(OWNER));
+        store.bannerEnabled(OWNER, true);
+        assertTrue(new KeywordReminderStore(context).bannerEnabled(OWNER));
+        assertFalse(store.bannerEnabled(600));
+        watch(WatchedPerson.PRIVATE, false);
+        enable();
+        send(PERSON, 7, WatchedPerson.PRIVATE, PERSON, "hello");
+        drain();
+        assertEquals(1, count());
+        assertEquals(1, store.history(OWNER).size());
+    }
+
+    @Implements(LaunchActivity.class)
+    public static class CurrentChat extends ShadowActivity {
+        static BaseFragment top;
+        @Implementation protected static BaseFragment getSafeLastFragment() { return top; }
+    }
+
+    @Implements(ChatActivity.class)
+    public static class ChatWithoutAccountInitialization {
+        @Implementation protected void __constructor__(Bundle args) { }
+    }
+
+    public static class FocusedWindow extends LaunchActivity {
+        boolean focused = true;
+        @Override public boolean hasWindowFocus() { return focused; }
+    }
+
+    @Test
+    @Config(shadows = {CurrentChat.class, ChatWithoutAccountInitialization.class})
+    public void watchedPrivateMessageChecksVisibilityAtPublicationAndStillRecordsOnce() {
+        UserConfig userConfig = UserConfig.getInstance(0);
+        TLRPC.User previousUser = userConfig.getCurrentUser();
+        TLRPC.User owner = new TLRPC.TL_user();
+        owner.id = OWNER;
+        int previousAccount = UserConfig.selectedAccount;
+        boolean previousActive = LaunchActivity.isActive;
+        boolean previousPaused = ApplicationLoader.mainInterfacePaused;
+        boolean previousScreenOn = ApplicationLoader.isScreenOn;
+        LaunchActivity previousActivity = LaunchActivity.instance;
+        FocusedWindow window = Robolectric.buildActivity(FocusedWindow.class).get();
+        KeywordReminderStore store = new KeywordReminderStore(context);
+        int[] visibleMessage = {0};
+        try {
+            // Supply the local identity without starting the Telegram account or its native network.
+            ReflectionHelpers.setField(userConfig, "currentUser", owner);
+            UserConfig.selectedAccount = 0;
+            LaunchActivity.instance = window;
+            LaunchActivity.isActive = true;
+            ApplicationLoader.mainInterfacePaused = false;
+            ApplicationLoader.isScreenOn = true;
+            CurrentChat.top = new ChatActivity(new Bundle()) {
+                @Override public Activity getParentActivity() { return window; }
+                @Override public long getDialogId() { return PERSON; }
+                @Override public boolean isNewMessageVisibleForReminder(int id) { return visibleMessage[0] == id; }
+            };
+            controller.engine().setKeywords(Collections.singletonList("keyword"));
+            watch(WatchedPerson.PRIVATE, false);
+            enable();
+
+            send(PERSON, 1, WatchedPerson.PRIVATE, PERSON, "keyword");
+            drain();
+            assertEquals("Allow the chat to render before publishing", 0, store.history(OWNER).size());
+            visibleMessage[0] = 1;
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500));
+            assertEquals(0, count());
+            assertEquals(1, store.history(OWNER).size());
+
+            visibleMessage[0] = 0;
+            send(PERSON, 2, WatchedPerson.PRIVATE, PERSON, "outside the viewport");
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500));
+            assertEquals(1, count());
+
+            visibleMessage[0] = 3;
+            send(PERSON, 3, WatchedPerson.PRIVATE, PERSON, "visible before leaving");
+            window.focused = false;
+            send(PERSON, 1, WatchedPerson.PRIVATE, PERSON, "duplicate after leaving");
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500));
+            assertEquals(2, count());
+            assertEquals(3, store.history(OWNER).size());
+
+            window.focused = true;
+            visibleMessage[0] = 4;
+            controller.engine().setWatched(OWNER, Collections.emptyList());
+            send(PERSON, 4, WatchedPerson.PRIVATE, PERSON, "keyword only");
+            drain();
+            assertEquals(3, count());
+            assertEquals(3, store.history(OWNER).size());
+        } finally {
+            CurrentChat.top = null;
+            LaunchActivity.instance = previousActivity;
+            LaunchActivity.isActive = previousActive;
+            ApplicationLoader.mainInterfacePaused = previousPaused;
+            ApplicationLoader.isScreenOn = previousScreenOn;
+            UserConfig.selectedAccount = previousAccount;
+            ReflectionHelpers.setField(userConfig, "currentUser", previousUser);
+        }
+    }
+
     @Test public void privateGroupChannelAndCommentsWithoutKeyword() {
         watch(WatchedPerson.ALL,false); enable();
         send(PERSON,1,1,PERSON,"private"); send(-20,1,2,PERSON,"muted group");
@@ -184,7 +386,9 @@ public class WatchedPersonReminderTest {
         List<Runnable> old=new ArrayList<>(jobs.submitted); controller.engine().disable();
         for (Runnable r:old) r.run(); send(PERSON,2,1,PERSON,"off"); status(-1); status(accounts.now+200); drain();
         assertEquals(0,count()); assertEquals(0,matches); assertEquals(0,writes);
-        assertEquals(1,new KeywordReminderStore(context).watched(OWNER).size());
+        List<WatchedPerson> restored = new KeywordReminderStore(context).watched(OWNER);
+        assertEquals(1,restored.size());
+        assertFalse(restored.get(0).privateRead);
     }
     @Test public void removePersonInvalidatesPendingMessageAndPresenceTasks() {
         watch(7,true); enable(); send(PERSON,1,1,PERSON,"queued"); queueStatus(-1); queueStatus(accounts.now+100);
@@ -261,12 +465,155 @@ public class WatchedPersonReminderTest {
         WatchedPerson person=new WatchedPerson(PERSON,"Alice",0,false); view.editPerson(person); drain();
         AlertDialog dialog=(AlertDialog)org.robolectric.shadows.ShadowDialog.getLatestDialog();
         List<TextCheckCell> checks=new ArrayList<>(); collect(dialog.getWindow().getDecorView(),checks);
-        assertEquals(4,checks.size()); checks.get(0).performClick(); checks.get(3).performClick();
+        assertEquals(5,checks.size()); assertFalse(checks.get(4).isChecked());
+        checks.get(0).performClick(); checks.get(3).performClick(); checks.get(4).performClick();
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
         WatchedPerson saved=controller.engine().watched(OWNER).get(0); assertEquals(1,saved.scopes); assertTrue(saved.online);
+        assertTrue(saved.privateRead);
         view.editPerson(saved); drain(); dialog=(AlertDialog)org.robolectric.shadows.ShadowDialog.getLatestDialog();
         dialog.getButton(AlertDialog.BUTTON_NEUTRAL).performClick(); assertTrue(controller.engine().watched(OWNER).isEmpty());
         activity.finish();
+    }
+    @Test public void privateOutboxReceiptBatchesConfirmedSendsAndRoutesToLastMessage() {
+        watchPrivateReads(true);
+        enable();
+        sendOutgoing(0, PERSON, -1, WatchedPerson.PRIVATE);
+        sendOutgoing(0, PERSON, -2, WatchedPerson.PRIVATE);
+        confirm(0, PERSON, -1, 101);
+        confirm(0, PERSON, -2, 104);
+        read(0, PERSON, 104, false);
+        drain();
+        assertEquals(0, count());
+
+        accounts.now += 60;
+        read(0, PERSON, 104, true);
+        read(0, PERSON, 104, true);
+        read(0, PERSON, 101, true);
+        drain();
+        assertEquals(1, count());
+        KeywordReminderStore store = new KeywordReminderStore(context);
+        WatchedPersonRecord record = store.history(OWNER).get(0);
+        assertEquals(1, store.history(OWNER).size());
+        assertEquals(2, record.privateReadCount);
+        assertEquals(104, record.messageId);
+        assertEquals(accounts.now, record.date);
+        Notification notice = notifications.getActiveNotifications()[0].getNotification();
+        assertEquals("Read 2 messages you sent", notice.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+        Intent route = shadowOf(notice.contentIntent).getSavedIntent();
+        assertEquals(PERSON, route.getLongExtra("userId", 0));
+        assertEquals(104, route.getIntExtra("messageId", 0));
+        assertFalse(prefs.getString(KeywordReminderStore.historyKey(OWNER), "").contains("message body"));
+
+        controller.engine().shutdown();
+        controller = create();
+        controller.engine().restore();
+        assertTrue(controller.engine().activeWatched().get(0).privateRead);
+        read(0, PERSON, 104, true);
+        drain();
+        assertEquals(1, store.history(OWNER).size());
+    }
+
+    @Test public void privateReadWaitsForSendConfirmationAndIgnoresUntrackedMessages() {
+        enable();
+        sendOutgoing(0, PERSON, -1, WatchedPerson.PRIVATE);
+        watchPrivateReads(true);
+        confirm(0, PERSON, -1, 101);
+        sendOutgoing(1, PERSON, -2, WatchedPerson.PRIVATE);
+        confirm(1, PERSON, -2, 102);
+        sendOutgoing(0, -20, -3, WatchedPerson.GROUP);
+        confirm(0, -20, -3, 103);
+        read(0, -20, 103, true);
+        read(0, PERSON, 102, true);
+        sendOutgoing(0, PERSON, -4, WatchedPerson.PRIVATE);
+        read(0, PERSON, 104, true);
+        long observedAt = accounts.now;
+        drain();
+        assertEquals(0, count());
+
+        accounts.now += 3;
+        confirm(0, PERSON, -4, 104);
+        confirm(0, PERSON, -4, 104);
+        drain();
+        assertEquals(1, count());
+        WatchedPersonRecord record = new KeywordReminderStore(context).history(OWNER).get(0);
+        assertEquals(1, record.privateReadCount);
+        assertEquals(104, record.messageId);
+        assertEquals(observedAt, record.date);
+    }
+
+    @Test public void disablingReadAlertsCancelsQueuedNoticeAndDiscardsTracking() {
+        watchPrivateReads(true);
+        enable();
+        sendOutgoing(0, PERSON, -1, WatchedPerson.PRIVATE);
+        confirm(0, PERSON, -1, 100);
+        read(0, PERSON, 100, true);
+        List<Runnable> stale = new ArrayList<>(jobs.submitted);
+        assertEquals(1, stale.size());
+        sendOutgoing(0, PERSON, -2, WatchedPerson.PRIVATE);
+        confirm(0, PERSON, -2, 101);
+        watchPrivateReads(false);
+        watchPrivateReads(true);
+        stale.forEach(Runnable::run);
+        read(0, PERSON, 101, true);
+        drain();
+        assertEquals(0, count());
+        assertTrue(new KeywordReminderStore(context).history(OWNER).isEmpty());
+        assertTrue(new KeywordReminderStore(context).pendingPrivateReads(OWNER, PERSON).isEmpty());
+
+        sendOutgoing(0, PERSON, -3, WatchedPerson.PRIVATE);
+        confirm(0, PERSON, -3, 102);
+        read(0, PERSON, 102, true);
+        controller.engine().disable();
+        enable();
+        read(0, PERSON, 102, true);
+        drain();
+        assertEquals(0, count());
+        assertTrue(new KeywordReminderStore(context).history(OWNER).isEmpty());
+        assertTrue(new KeywordReminderStore(context).pendingPrivateReads(OWNER, PERSON).isEmpty());
+    }
+
+    @Test public void serverSnapshotReconcilesOnlyPersistedTrackedIdsAfterRestart() {
+        watchPrivateReads(true);
+        enable();
+        serverSnapshot(0, PERSON, 100);
+        sendOutgoing(0, PERSON, -1, WatchedPerson.PRIVATE);
+        sendOutgoing(0, PERSON, -2, WatchedPerson.PRIVATE);
+        sendOutgoing(0, PERSON, -3, WatchedPerson.PRIVATE);
+        confirm(0, PERSON, -1, 101);
+        confirm(0, PERSON, -2, 104);
+        confirm(0, PERSON, -3, 106);
+        KeywordReminderStore store = new KeywordReminderStore(context);
+        assertEquals(Arrays.asList(101, 104, 106), store.pendingPrivateReads(OWNER, PERSON));
+        controller.engine().shutdown();
+        controller = create();
+        controller.engine().restore();
+        serverSnapshot(1, PERSON, 106);
+        serverSnapshot(0, PERSON, 100);
+        drain();
+        assertEquals(0, count());
+
+        accounts.now += 120;
+        serverSnapshot(0, PERSON, 105);
+        read(0, PERSON, 105, true);
+        drain();
+        assertEquals(1, count());
+        assertEquals(Collections.singletonList(106), store.pendingPrivateReads(OWNER, PERSON));
+        WatchedPersonRecord record = store.history(OWNER).get(0);
+        assertEquals(2, record.privateReadCount);
+        assertEquals(104, record.messageId);
+        assertEquals(accounts.now, record.date);
+
+        controller.engine().shutdown();
+        controller = create();
+        controller.engine().restore();
+        serverSnapshot(0, PERSON, 105);
+        drain();
+        assertEquals(1, store.history(OWNER).size());
+        serverSnapshot(0, PERSON, 106);
+        drain();
+        assertEquals(2, store.history(OWNER).size());
+        assertEquals(106, store.history(OWNER).get(0).messageId);
+        assertTrue(store.pendingPrivateReads(OWNER, PERSON).isEmpty());
     }
     private void collect(android.view.View view,List<TextCheckCell> checks) {
         if(view instanceof TextCheckCell) checks.add((TextCheckCell)view);

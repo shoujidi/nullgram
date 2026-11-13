@@ -1,6 +1,9 @@
 package top.nkbe.niagram.helpers;
 
 import org.telegram.ui.MainTabsActivity;
+import org.telegram.messenger.ApplicationLoader;
+import com.nullgram.client.appearance.DisguiseListTheme;
+import com.nullgram.client.appearance.QqListStyle;
 
 import top.nkbe.niagram.config.NyaConfig;
 
@@ -16,15 +19,16 @@ public final class MainTabsHelper {
     }
 
     public static boolean isMainTabsHideTitleStyle() {
-        return NyaConfig.INSTANCE.getMainTabsHideTitles().Bool();
+        return !DisguiseListTheme.isQq() && NyaConfig.INSTANCE.getMainTabsHideTitles().Bool();
     }
 
     public static int getMainTabsHeight() {
-        return isMainTabsHideTitleStyle() ? FILTER_TABS_HEIGHT : MAIN_TABS_HEIGHT;
+        return DisguiseListTheme.isQq() ? QqListStyle.navigationHeight(ApplicationLoader.applicationContext)
+                : isMainTabsHideTitleStyle() ? FILTER_TABS_HEIGHT : MAIN_TABS_HEIGHT;
     }
 
     public static int getMainTabsMargin() {
-        return isMainTabsHideTitleStyle() ? MAIN_TABS_MARGIN_COMPACT : MAIN_TABS_MARGIN;
+        return DisguiseListTheme.isQq() ? 0 : isMainTabsHideTitleStyle() ? MAIN_TABS_MARGIN_COMPACT : MAIN_TABS_MARGIN;
     }
 
     public static int getMainTabsHeightWithMargins() {
@@ -32,7 +36,11 @@ public final class MainTabsHelper {
     }
 
     public static boolean isContactsTabHidden() {
-        return NyaConfig.INSTANCE.getMainTabsHideContacts().Bool();
+        return !DisguiseListTheme.isQq() && NyaConfig.INSTANCE.getMainTabsHideContacts().Bool();
+    }
+
+    public static boolean isBottomNavigationHidden() {
+        return !DisguiseListTheme.isQq() && NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool();
     }
 
     public static int getChatsPosition() {

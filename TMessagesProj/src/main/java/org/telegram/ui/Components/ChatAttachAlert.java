@@ -81,6 +81,8 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+
+import com.nullgram.client.permissions.VisualMediaAccess;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.math.MathUtils;
 import androidx.core.view.ViewCompat;
@@ -2834,13 +2836,11 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                     if (!documentsEnabled && checkCanRemoveRestrictionsByBoosts()) {
                         return;
                     }
-                    if (Build.VERSION.SDK_INT >= 33) {
-                        if (activity.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED ||
-                                activity.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED) {
-                            activity.requestPermissions(new String[]{Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO}, BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE);
-                            return;
-                        }
-                    } else if (Build.VERSION.SDK_INT >= 23 && activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    if (documentsEnabled && useSystemDocumentPicker()) {
+                        ((ChatActivity) baseFragment).startDocumentSelectActivity();
+                        return;
+                    }
+                    if (Build.VERSION.SDK_INT < 33 && activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                         AndroidUtilities.findActivity(getContext()).requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE);
                         return;
                     }
@@ -5110,6 +5110,10 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         showLayout(colorsLayout);
     }
 
+    private boolean useSystemDocumentPicker() {
+        return baseFragment instanceof ChatActivity && !isPollAttach && documentsDelegate == null;
+    }
+
     private void openDocumentsLayout(boolean show) {
         if (!documentsEnabled) {
             if (show) {
@@ -6586,8 +6590,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
 
     private static boolean checkPhotoAndCameraPermission(Context context) {
         if (Build.VERSION.SDK_INT >= 33) {
-            return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
-                && ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+            return VisualMediaAccess.canRead(VisualMediaAccess.current(context), true, true)
                 && ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
         } else if (Build.VERSION.SDK_INT >= 23) {
             return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
@@ -6598,8 +6601,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
 
     private static boolean checkPhotoAndDocumentsPermission(Context context) {
         if (Build.VERSION.SDK_INT >= 33) {
-            return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
-                && ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED;
+            return true;
         } else if (Build.VERSION.SDK_INT >= 23) {
             return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
         }
@@ -6760,7 +6762,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                     } else if (position == documentButton) {
                         attachButton.setTextAndIcon(4, getString(R.string.ChatDocument), GlassTabView.TabAnimation.FILES);
                         attachButton.setTag(4);
-                        err = !checkPhotoAndDocumentsPermission(mContext);
+                        err = !useSystemDocumentPicker() && !checkPhotoAndDocumentsPermission(mContext);
                     } else if (position == locationButton) {
                         attachButton.setTextAndIcon(6, getString(R.string.ChatLocation), GlassTabView.TabAnimation.LOCATION);
                         attachButton.setTag(6);

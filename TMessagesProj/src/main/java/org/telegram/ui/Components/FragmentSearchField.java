@@ -183,6 +183,22 @@ public class FragmentSearchField extends FrameLayout implements FactorAnimator.T
     }
 
     private Drawable bg;
+    private boolean qqAppearance;
+    private final android.text.TextPaint qqHintPaint = new android.text.TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+    private boolean showQqIdleHint() {
+        return qqAppearance && !editText.hasFocus() && editText.length() == 0 && currentSearchFilters.isEmpty();
+    }
+    @Override protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
+        if (showQqIdleHint() && (child == editText || child == searchIcon)) return false;
+        return super.drawChild(canvas, child, drawingTime);
+    }
+
+    public void setQqAppearance(boolean enabled) {
+        qqAppearance = enabled;
+        searchIcon.setImageResource(enabled ? R.drawable.nullgram_qq_search : R.drawable.outline_search_1_24);
+        updateColors();
+        invalidate();
+    }
 
     @Override
     protected void dispatchDraw(@NonNull Canvas canvas) {
@@ -190,13 +206,13 @@ public class FragmentSearchField extends FrameLayout implements FactorAnimator.T
         if (bg != null) {
             bg.setBounds(
                 getPaddingLeft(),
-                getPaddingTop(),
+                getPaddingTop() + (qqAppearance ? dp(6) : 0),
                 getWidth() - getPaddingRight(),
-                getHeight() - getPaddingBottom()
+                getHeight() - getPaddingBottom() - (qqAppearance ? dp(6) : 0)
             );
             bg.draw(canvas);
         }
-        if (blurredBackgroundDrawable != null) {
+        if (blurredBackgroundDrawable != null && !qqAppearance) {
             blurredBackgroundDrawable.setBounds(
                     getPaddingLeft() - dp(4),
                     getPaddingTop() - dp(4),
@@ -205,6 +221,24 @@ public class FragmentSearchField extends FrameLayout implements FactorAnimator.T
             blurredBackgroundDrawable.draw(canvas);
         }
         super.dispatchDraw(canvas);
+        if (showQqIdleHint()) {
+            qqHintPaint.setTextSize(com.nullgram.client.appearance.QqListStyle.sp(getContext(), 15));
+            qqHintPaint.setColor(com.nullgram.client.appearance.DisguiseListTheme.GRAY);
+            String hint = org.telegram.messenger.LocaleController.getString(org.telegram.messenger.R.string.Search);
+            float textWidth = qqHintPaint.measureText(hint), x = (getWidth() - textWidth - dp(25)) / 2f;
+            Drawable icon = searchIcon.getDrawable();
+            if (icon != null) {
+                canvas.save();
+                canvas.translate(x - searchIcon.getLeft(), 0);
+                // Draw the existing search icon without changing its click target or focus behavior.
+                canvas.translate(searchIcon.getLeft(), (getHeight() - dp(20)) / 2f);
+                canvas.scale(20f / 24f, 20f / 24f);
+                icon.setBounds(0, 0, dp(24), dp(24));
+                icon.draw(canvas);
+                canvas.restore();
+            }
+            canvas.drawText(hint, x + dp(25), (getHeight() - qqHintPaint.ascent() - qqHintPaint.descent()) / 2f, qqHintPaint);
+        }
         canvas.restore();
     }
 
@@ -215,7 +249,7 @@ public class FragmentSearchField extends FrameLayout implements FactorAnimator.T
     }
 
     public void setBlurredBackgroundVisibility(float visibility) {
-        final int alpha = (int) (255 * visibility);
+        final int alpha = qqAppearance ? 0 : (int) (255 * visibility);
         boolean changed = false;
         if (blurredBackgroundDrawable != null) {
             if (blurredBackgroundDrawable.getAlpha() != alpha) {
@@ -274,7 +308,7 @@ public class FragmentSearchField extends FrameLayout implements FactorAnimator.T
     @Override
     public void updateColors() {
         final boolean isDark = resourcesProvider != null ? resourcesProvider.isDark() : Theme.isCurrentThemeDark();
-        bg = isSectionBackground ?
+        bg = qqAppearance ? Theme.createRoundRectDrawable(dp(8), com.nullgram.client.appearance.DisguiseListTheme.SEARCH) : isSectionBackground ?
             Theme.createRoundRectDrawableShadowed(dp(20), getThemedColor(Theme.key_windowBackgroundWhite)) :
             Theme.createRoundRectDrawable(dp(20), isWhiteBackground ? getThemedColor(Theme.key_windowBackgroundWhite) : getThemedColor(Theme.key_windowBackgroundWhiteBlackText, isDark ? 0.07f : 0.05f));
         searchIcon.setColorFilter(getThemedColor(Theme.key_windowBackgroundWhiteBlackText, 0.6f), PorterDuff.Mode.MULTIPLY);

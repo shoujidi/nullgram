@@ -19,6 +19,8 @@ import static org.telegram.messenger.LocaleController.getString;
 import static org.telegram.messenger.MessageObject.getMedia;
 import static org.telegram.messenger.MessageObject.replaceWithLink;
 
+import top.nkbe.niagram.helpers.LocalNameHelper;
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
@@ -129,6 +131,7 @@ import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.RichMessageLayout;
+import org.telegram.messenger.RichQuote;
 import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.SvgHelper;
@@ -13087,6 +13090,27 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (!quote) {
             quoteHighlight = null;
         }
+        if (quote && messageObject.richLayout != null) {
+            if (byClick) {
+                messageObject.richLayout.openDetails(RichQuote.findCollapsedDetails(messageObject, text, quote_offset));
+            }
+            final int[] range = RichQuote.findQuote(messageObject, text, quote_offset);
+            if (range == null) {
+                if (quoteHighlight != null) {
+                    quoteHighlight = null;
+                    invalidate();
+                }
+                return false;
+            }
+            highlightedQuote = true;
+            if (quoteHighlight == null || quoteHighlight.todo || quoteHighlight.poll || quoteHighlight.id != messageObject.getId() || quoteHighlight.start != range[0] || quoteHighlight.end != range[1]) {
+                final QuoteHighlight prev = quoteHighlight;
+                quoteHighlight = new QuoteHighlight(this, getParent(), messageObject.getId(), messageObject.richLayout, range[0], range[1]);
+                quoteHighlight.continueFrom(prev);
+            }
+            invalidate();
+            return true;
+        }
         String message;
         if (currentCaption != null) {
             message = currentCaption.toString();
@@ -14498,11 +14522,20 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     canvas.save();
                 }
                 canvas.translate(textX, textY);
+                layout.draw(canvas, padLeft, padRight, transitionParams);
+                // drawn on top, so block backgrounds (table headers, code) don't cover them
                 if (delegate != null && delegate.getTextSelectionHelper() != null) {
                     delegate.getTextSelectionHelper().drawRich(currentMessageObject, layout, canvas);
                 }
-                layout.draw(canvas, padLeft, padRight, transitionParams);
                 drawRichMessageTranslationLoading(canvas, layout, alpha);
+                canvas.translate(-textX, -textY);
+                if (quoteHighlight != null && !quoteHighlight.todo && !quoteHighlight.poll && currentBackgroundDrawable != null) {
+                    canvas.save();
+                    canvas.clipPath(currentBackgroundDrawable.makePath());
+                    quoteHighlight.paint.setColor(Theme.multAlpha(getThemedColor(currentMessageObject.isOutOwner() && !currentMessageObject.preview ? Theme.key_chat_outReplyLine : Theme.key_chat_inReplyLine), .2f));
+                    quoteHighlight.draw(canvas, textX, textY, currentBackgroundDrawable.getBounds(), getHighlightAlpha(true));
+                    canvas.restore();
+                }
                 canvas.restore();
 
                 if (botDraftTypingAnimator != null && botDraftTypingAnimator.isRunning()) {
@@ -18638,7 +18671,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             timeString = "";
         } else if (currentMessageObject.scheduled && currentMessageObject.messageOwner.date == 0x7FFFFFFE) {
             timeString = "";
-        } else if (currentMessageObject.realDate != 0) {
+        } else if (currentMessageObject.realDate != 0 && messageObject.messageOwner.repeatDisplayDate == 0) {
             timeString = LocaleController.formatSmallDateChat(currentMessageObject.realDate) + ", " + LocaleController.getInstance().getFormatterDay().format((long) (currentMessageObject.realDate) * 1000);
         } else if (currentMessageObject.isRepostPreview) {
             timeString = LocaleController.formatSmallDateChat(messageObject.messageOwner.date) + ", " + LocaleController.getInstance().getFormatterDay().format((long) (messageObject.messageOwner.date) * 1000);
@@ -18652,14 +18685,14 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             timeString = TimeStringHelper.createTranslatedString(currentMessageObject, false, showBookmarkInTime, senderNameColor);
         } else if (showBookmarkInTime) {
             timeString = TimeStringHelper.createBookmarkedString(currentMessageObject, senderNameColor);
-        } else if (currentMessageObject.isSaved && currentMessageObject.messageOwner.fwd_from != null && (currentMessageObject.messageOwner.fwd_from.date != 0 || currentMessageObject.messageOwner.fwd_from.saved_date != 0)) {
+        } else if (currentMessageObject.isSaved && messageObject.messageOwner.repeatDisplayDate == 0 && currentMessageObject.messageOwner.fwd_from != null && (currentMessageObject.messageOwner.fwd_from.date != 0 || currentMessageObject.messageOwner.fwd_from.saved_date != 0)) {
             int date = currentMessageObject.messageOwner.fwd_from.saved_date;
             if (date == 0) {
                 date = currentMessageObject.messageOwner.fwd_from.date;
             }
             timeString = LocaleController.formatSeenDate(date);
         } else {
-            timeString = LocaleController.getInstance().getFormatterDay().format((long) (messageObject.messageOwner.date) * 1000);
+            timeString = LocaleController.getInstance().getFormatterDay().format((long) messageObject.getDisplayedSendDate() * 1000);
         }
         if (currentMessageObject.messageOwner.video_processing_pending) {
             timeString = formatString(R.string.ScheduledTimeApprox, timeString);
@@ -20018,19 +20051,19 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     private String getAuthorName() {
         if (currentUser != null) {
-            return UserObject.getUserName(currentUser);
+            return LocalNameHelper.name(currentAccount, currentUser);
         } else if (currentChat != null) {
             if (currentMessageObject != null && (currentMessageObject.getDialogId() != UserObject.REPLY_BOT) && currentChat.signature_profiles) {
                 long did = DialogObject.getPeerDialogId(currentMessageObject.messageOwner.from_id);
                 if (did >= 0) {
                     TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(did);
-                    if (user != null) return UserObject.getUserName(user);
+                    if (user != null) return LocalNameHelper.name(currentAccount, user);
                 } else {
                     TLRPC.Chat chat = MessagesController.getInstance(currentAccount).getChat(-did);
-                    if (chat != null) return chat.title;
+                    if (chat != null) return LocalNameHelper.name(currentAccount, chat);
                 }
             }
-            return currentChat.title;
+            return LocalNameHelper.name(currentAccount, currentChat);
         } else if (currentMessageObject != null && currentMessageObject.isSponsored()) {
             return currentMessageObject.sponsoredTitle;
         }

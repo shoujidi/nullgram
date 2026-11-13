@@ -136,11 +136,14 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     private boolean dropCallsFragmentAfterPageScroll;
 
     private UpdateLayoutWrapper updateLayoutWrapper;
+    private boolean qqTabsAppearance;
+    private FrameLayout.LayoutParams originalTabsParams;
     private FrameLayout tabsViewWrapper;
     private MainTabsLayout tabsView;
     private BlurredBackgroundDrawable tabsViewBackground;
     private View fadeView;
-    private boolean lastHideContacts = NyaConfig.INSTANCE.getMainTabsHideContacts().Bool();
+    private boolean lastHideContacts = MainTabsHelper.isContactsTabHidden();
+    private boolean lastQqAppearance = com.nullgram.client.appearance.DisguiseListTheme.isQq();
 
     public MainTabsActivity() {
         super();
@@ -219,7 +222,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         Bulletin.Delegate delegate = new Bulletin.Delegate() {
             @Override
             public int getBottomOffset(int tag) {
-                return navigationBarHeight + (NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool() ? 0 : dp(MainTabsHelper.getMainTabsHeight() + MainTabsHelper.getMainTabsMargin()));
+                return navigationBarHeight + (MainTabsHelper.isBottomNavigationHidden() ? 0 : dp(MainTabsHelper.getMainTabsHeight() + MainTabsHelper.getMainTabsMargin()));
             }
         };
 
@@ -420,6 +423,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabsViewWrapper = new FrameLayout(context);
         tabsViewWrapper.setOnClickListener(v -> {});
         tabsViewWrapper.addView(tabsView, LayoutHelper.createFrame(tabsViewWidth, MainTabsHelper.getMainTabsHeightWithMargins(), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
+        originalTabsParams = new FrameLayout.LayoutParams((FrameLayout.LayoutParams) tabsView.getLayoutParams());
+        qqTabsAppearance = false;
         tabsViewWrapper.setClipToPadding(false);
         contentView.addView(tabsViewWrapper, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
 
@@ -433,6 +438,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         updateLayout();
         checkUnreadCount(false);
+        updateQqTabsAppearance();
         return contentView;
     }
 
@@ -856,7 +862,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             args.putBoolean("hasMainTabs", true);
             return new ContactsActivity(args);
         } else if (position == MainTabsHelper.getCallsOrSettingsPosition()) {
-            if (getUserConfig().showCallsTab) {
+            if (com.nullgram.client.appearance.DisguiseListTheme.isQq() || getUserConfig().showCallsTab) {
                 Bundle args = new Bundle();
                 args.putBoolean("needFinishFragment", false);
                 args.putBoolean("hasMainTabs", true);
@@ -891,7 +897,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     @Override
     public void clearViews() {
         final boolean hideContacts = MainTabsHelper.isContactsTabHidden();
-        if (hideContacts != lastHideContacts) {
+        if (hideContacts != lastHideContacts || lastQqAppearance != com.nullgram.client.appearance.DisguiseListTheme.isQq()) {
             if (viewPager != null) {
                 // Ensure ViewPagerFixed is not left with an out-of-range position on rebuild.
                 viewPager.setPosition(getStartPosition());
@@ -904,6 +910,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
             dropCallsFragmentAfterPageScroll = false;
             lastHideContacts = hideContacts;
+            lastQqAppearance = com.nullgram.client.appearance.DisguiseListTheme.isQq();
         }
 
         super.clearViews();
@@ -912,6 +919,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     public GlassTabView[] tabs;
 
     public void selectTab(int position, boolean animated) {
+        updateQqTabsAppearance();
         for (int a = 0; a < tabs.length; a++) {
             GlassTabView tab = tabs[a];
             tab.setSelected(indexToPosition(a) == position, animated);
@@ -955,7 +963,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     }
 
     private boolean canScrollInternal(MotionEvent ev, boolean forward) {
-        if (NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool()) {
+        if (MainTabsHelper.isBottomNavigationHidden()) {
             return false;
         }
         final BaseFragment fragment = getCurrentVisibleFragment();
@@ -990,7 +998,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         ViewGroup.MarginLayoutParams lp;
         {
-            final int height = navigationBarHeight + updateLayoutHeight + (NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool() ? 0 : dp(MainTabsHelper.getMainTabsHeightWithMargins()));
+            final int height = navigationBarHeight + updateLayoutHeight + (MainTabsHelper.isBottomNavigationHidden() ? 0 : dp(MainTabsHelper.getMainTabsHeightWithMargins()));
             lp = (ViewGroup.MarginLayoutParams) fadeView.getLayoutParams();
             if (lp.height != height) {
                 lp.height = height;
@@ -1119,7 +1127,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     }
 
     private void checkUi_fadeView() {
-        if (viewPager == null || fadeView == null || NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool()) {
+        if (qqTabsAppearance && fadeView != null) { fadeView.setVisibility(View.GONE); return; }
+        if (viewPager == null || fadeView == null || MainTabsHelper.isBottomNavigationHidden()) {
             return;
         }
 
@@ -1136,9 +1145,29 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         fadeView.setVisibility(alpha > 0 ? View.VISIBLE : View.GONE);
     }
 
+    private void updateQqTabsAppearance() {
+        if (tabsViewWrapper == null || originalTabsParams == null || viewPager == null) return;
+        boolean enabled = com.nullgram.client.appearance.DisguiseListTheme.isQq();
+        if (qqTabsAppearance == enabled) return;
+        qqTabsAppearance = enabled;
+        tabsView.setQqAppearance(enabled);
+        int margin = MainTabsHelper.getMainTabsMargin();
+        tabsView.setPadding(dp(enabled ? 0 : margin + 4), dp(enabled ? 0 : margin + 4),
+                dp(enabled ? 0 : margin + 4), dp(enabled ? 0 : margin + 4));
+        tabsView.setMaxWidth(enabled ? 0 : dp(328 + DialogsActivity.MAIN_TABS_MARGIN * 2));
+        tabsView.setLayoutParams(enabled
+                ? LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, MainTabsHelper.getMainTabsHeight(), Gravity.BOTTOM)
+                : new FrameLayout.LayoutParams(originalTabsParams));
+        tabsView.setBackground(enabled ? new android.graphics.drawable.ColorDrawable(0xfffafafa) : tabsViewBackground);
+        tabsViewWrapper.setBackgroundColor(enabled ? 0xfffafafa : android.graphics.Color.TRANSPARENT);
+        for (int i = 0; i < tabs.length; i++) if (tabs[i] != null) tabs[i].setQqAppearance(enabled, i);
+        checkUi_fadeView();
+    }
+
     private void checkUi_tabsPosition() {
         if (tabsView == null) return;
-        if (NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool()) {
+        updateQqTabsAppearance();
+        if (MainTabsHelper.isBottomNavigationHidden()) {
             tabsView.setVisibility(View.GONE);
             return;
         }
@@ -1158,6 +1187,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     }
 
     private void checkUi_callTabVisible(boolean callTabsVisible, boolean animated) {
+        if (com.nullgram.client.appearance.DisguiseListTheme.isQq()) callTabsVisible = true;
         if (tabsView != null) {
             tabsView.setViewVisible(tabs[INDEX_SETTINGS], !callTabsVisible, animated);
             tabsView.setViewVisible(tabs[INDEX_CALLS], callTabsVisible, animated);
@@ -1229,7 +1259,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     private boolean accountSwitchHintShown;
 
     private void showAccountChangeHint() {
-        if (accountSwitchHintShown || NyaConfig.INSTANCE.getHideBottomNavigationBar().Bool()) return;
+        if (accountSwitchHintShown || MainTabsHelper.isBottomNavigationHidden()) return;
 
         if (accountSwitchHint == null && HintsController.Hint.AccountSwitchHint.show()) {
             AndroidUtilities.runOnUIThread(() -> {
@@ -1362,10 +1392,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     }
 
     private void addChatsMenuItems(ItemOptions o, View button) {
-        o.add(R.drawable.menu_recent, getString(R.string.RecentChats), () -> {
-            o.dismiss();
-            BackButtonMenuRecent.show(currentAccount, this, button);
-        });
+        BackButtonMenuRecent.addMenu(this, o, button);
         o.addGap();
         o.add(R.drawable.msg_archive, getString(R.string.ArchivedChats), () -> {
             Bundle args = new Bundle();

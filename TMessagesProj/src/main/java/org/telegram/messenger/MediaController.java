@@ -85,7 +85,8 @@ import androidx.media3.extractor.jpeg.XmpMotionPhotoDescriptionParser;
 import org.telegram.ui.AspectRatioFrameLayout;
 import com.google.android.gms.cast.MediaMetadata;
 import com.google.android.gms.common.images.WebImage;
-import com.radolyn.ayugram.AyuConstants;
+import com.nullgram.client.permissions.VisualMediaAccess;
+import top.nkbe.niagram.ayu.AyuConstants;
 
 import org.telegram.messenger.audioinfo.AudioInfo;
 import org.telegram.messenger.chromecast.ChromecastController;
@@ -1054,6 +1055,8 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     public static ArrayList<AlbumEntry> allMediaAlbums = new ArrayList<>();
     public static ArrayList<AlbumEntry> allPhotoAlbums = new ArrayList<>();
     private static Runnable broadcastPhotosRunnable;
+    private static int loadedGalleryAccess = -1;
+    private static volatile int galleryAccessGeneration;
 
     public boolean isSilent = false;
     private boolean isPaused = false;
@@ -1156,6 +1159,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     private boolean audioRecorderV2Active;
     private boolean audioRecorderV2Stopping;
     private boolean audioRecorderV2VoiceOnce;
+    private AudioRecordingSession.Result audioRecorderV2PendingResult;
 
     private Runnable recordStartRunnable;
     private DispatchQueue recordQueue;
@@ -1331,23 +1335,21 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     }
 
     public static void checkGallery() {
-        if (Build.VERSION.SDK_INT < 24 || allPhotosAlbumEntry == null) {
+        int access = VisualMediaAccess.current(ApplicationLoader.applicationContext);
+        if (VisualMediaAccess.isLimited(access) || loadedGalleryAccess != -1 && loadedGalleryAccess != access) {
+            refreshGalleryAccess();
             return;
         }
-        final int prevSize = allPhotosAlbumEntry.photos.size();
+        if (Build.VERSION.SDK_INT < 24 || allMediaAlbumEntry == null) {
+            return;
+        }
+        final int prevSize = allMediaAlbumEntry.photos.size();
         Utilities.globalQueue.postRunnable(() -> {
             int count = 0;
             Cursor cursor = null;
             try {
                 final Context context = ApplicationLoader.applicationContext;
-                if (
-                    Build.VERSION.SDK_INT >= 33 && (
-                        context.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED ||
-                        context.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED ||
-                        context.checkSelfPermission(Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
-                    ) ||
-                    context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-                ) {
+                if (VisualMediaAccess.canRead(access, true, false)) {
                     cursor = MediaStore.Images.Media.query(context.getContentResolver(), MediaStore.Images.Media.EXTERNAL_CONTENT_URI, new String[]{"COUNT(_id)"}, null, null, null);
                     if (cursor != null) {
                         if (cursor.moveToNext()) {
@@ -1364,14 +1366,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             }
             try {
                 final Context context = ApplicationLoader.applicationContext;
-                if (
-                    Build.VERSION.SDK_INT >= 33 && (
-                        context.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED ||
-                        context.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED ||
-                        context.checkSelfPermission(Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
-                    ) ||
-                    context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-                ) {
+                if (VisualMediaAccess.canRead(access, false, true)) {
                     cursor = MediaStore.Images.Media.query(context.getContentResolver(), MediaStore.Video.Media.EXTERNAL_CONTENT_URI, new String[]{"COUNT(_id)"}, null, null, null);
                     if (cursor != null) {
                         if (cursor.moveToNext()) {
@@ -1523,7 +1518,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                             if (state == TelephonyManager.CALL_STATE_RINGING) {
                                 if (isPlayingMessage(playingMessageObject) && !isMessagePaused()) {
                                     pauseMessage(playingMessageObject);
-                                } else if (recordStartRunnable != null || recordingAudio != null) {
+                                } else if (isRecordingAudio()) {
                                     stopRecording(2, false, 0, false, 0);
                                 }
                                 EmbedBottomSheet embedBottomSheet = EmbedBottomSheet.getInstance();
@@ -2061,7 +2056,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     }
 
     protected boolean isRecordingAudio() {
-        return recordStartRunnable != null || recordingAudio != null;
+        return recordStartRunnable != null || audioRecorderV2StartRunnable != null || recordingAudio != null;
     }
 
     private boolean isNearToSensor(float value) {
@@ -4670,10 +4665,11 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             @Override
             public void onRecordingProgress(long durationMs, double amplitude) {
                 recordTimeCount = durationMs;
+                // The record button wave is tuned for the legacy amplitude, which is half of the RMS.
                 NotificationCenter.getInstance(recordingCurrentAccount).postNotificationName(
                         NotificationCenter.recordProgressChanged,
                         recordingGuid,
-                        amplitude
+                        amplitude / 2d
                 );
             }
 
@@ -4753,6 +4749,18 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
         recordingAudioFile = file;
         recordTimeCount = result.getDurationMs();
         updateAudioRecorderV2Document(file, result.getDurationMs(), result.getWaveform());
+        if (sendAfterDone == 3) {
+            // Scheduled sending keeps the file until the date picker calls stopRecording again,
+            // like legacy does for sendAfterDone == 3.
+            audioRecorderV2PendingResult = result;
+            if (audioRecorderV2Controller != null) {
+                audioRecorderV2Controller.release();
+                audioRecorderV2Controller = null;
+            }
+            requestRecordAudioFocus(false);
+            setBluetoothScoOn(false);
+            return;
+        }
         MediaDataController.getInstance(recordingCurrentAccount).pushDraftVoiceMessage(
                 recordDialogId,
                 recordTopicId,
@@ -4815,15 +4823,53 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             AutoDeleteMediaTask.unlockFile(recordingAudioFile);
             recordingAudioFile.delete();
         }
+        resetAudioRecorderV2State();
+        manualRecording = false;
+        raiseToEarRecord = false;
+        ignoreOnPause = false;
+    }
+
+    private void resetAudioRecorderV2State() {
         recordingAudio = null;
         recordingPrevAudioFile = null;
         recordingAudioFile = null;
         audioRecorderV2Active = false;
         audioRecorderV2Stopping = false;
         audioRecorderV2VoiceOnce = false;
-        manualRecording = false;
-        raiseToEarRecord = false;
-        ignoreOnPause = false;
+        audioRecorderV2PendingResult = null;
+        sendAfterDone = 0;
+    }
+
+    /**
+     * Makes room for another recording. A paused recording keeps its file for its voice draft,
+     * like legacy; an active capture is not interrupted.
+     */
+    private boolean releaseAudioRecorderV2ForNewRecording() {
+        if (audioRecorderV2PendingResult != null) {
+            File file = audioRecorderV2PendingResult.getFile();
+            AutoDeleteMediaTask.unlockFile(file);
+            file.delete();
+            resetAudioRecorderV2State();
+            return true;
+        }
+        AudioRecorderV2Controller controller = audioRecorderV2Controller;
+        if (controller == null || !controller.isPreviewing()) {
+            return false;
+        }
+        audioRecorderV2Controller = null;
+        if (!controller.detachPreviewOutput()) {
+            controller.release();
+        }
+        resetAudioRecorderV2State();
+        return true;
+    }
+
+    private void setSendAfterDone(int send, boolean notify, int scheduleDate, boolean once, long payStars) {
+        sendAfterDone = send;
+        sendAfterDoneNotify = notify;
+        sendAfterDoneScheduleDate = scheduleDate;
+        sendAfterDoneOnce = once;
+        sendAfterDonePayStars = payStars;
     }
 
     private void stopRecordingV2(
@@ -4833,16 +4879,45 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             boolean once,
             long payStars
     ) {
+        if (audioRecorderV2PendingResult != null) {
+            // Answer of the schedule date picker for an already stopped recording.
+            AudioRecordingSession.Result result = audioRecorderV2PendingResult;
+            audioRecorderV2PendingResult = null;
+            if (send == 0) {
+                finishAudioRecorderV2Lifecycle(false);
+            } else {
+                setSendAfterDone(send, notify, scheduleDate, once, payStars);
+                completeAudioRecordingV2(result);
+            }
+            return;
+        }
+        if (audioRecorderV2Stopping) {
+            // Only the schedule date picker may change a stop that is still finishing; any other
+            // late stop (a call, lowering the phone) must not turn a send into a preview.
+            if (sendAfterDone == 3) {
+                setSendAfterDone(send, notify, scheduleDate, once, payStars);
+                if (send == 0) {
+                    if (audioRecorderV2Controller != null) {
+                        audioRecorderV2Controller.cancel();
+                    }
+                    finishAudioRecorderV2Lifecycle(false);
+                }
+            }
+            return;
+        }
+        if (send == 2 && audioRecorderV2Controller != null && audioRecorderV2Controller.isPreviewing()) {
+            // Leaving the chat or an incoming call keeps a paused recording and its draft, like legacy.
+            manualRecording = false;
+            raiseToEarRecord = false;
+            ignoreOnPause = false;
+            return;
+        }
         if (audioRecorderV2StartRunnable != null) {
             AndroidUtilities.cancelRunOnUIThread(audioRecorderV2StartRunnable);
             audioRecorderV2StartRunnable = null;
         }
         audioRecorderV2Stopping = true;
-        sendAfterDone = send;
-        sendAfterDoneNotify = notify;
-        sendAfterDoneScheduleDate = scheduleDate;
-        sendAfterDoneOnce = once;
-        sendAfterDonePayStars = payStars;
+        setSendAfterDone(send, notify, scheduleDate, once, payStars);
 
         if (audioRecorderV2Controller == null) {
             finishAudioRecorderV2Lifecycle(false);
@@ -4859,14 +4934,55 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             );
         } catch (Exception ignore) {
         }
-        NotificationCenter.getInstance(recordingCurrentAccount).postNotificationName(
+        // Posted later, like legacy: the caller resets its recording UI state right after
+        // stopRecording(), and a synchronous recordStopped would be handled as a cancel.
+        final int account = recordingCurrentAccount;
+        final int guid = recordingGuid;
+        AndroidUtilities.runOnUIThread(() -> NotificationCenter.getInstance(account).postNotificationName(
                 NotificationCenter.recordStopped,
-                recordingGuid,
+                guid,
                 send == 2 ? 1 : 0
-        );
+        ));
+    }
+
+    private boolean showAudioRecorderV2Draft(
+            MediaDataController.DraftVoice draft,
+            MessageObject replyToMsg,
+            MessageObject replyToTopMsg,
+            TL_stories.StoryItem replyStory,
+            int guid,
+            SendMessageChatArguments sendMessageChatArguments,
+            long monoForumPeerId,
+            MessageSuggestionParams suggestionParams
+    ) {
+        if (audioRecorderV2Controller == null
+                || !audioRecorderV2Controller.isPreviewing()
+                || recordingAudio == null
+                || recordingAudioFile == null
+                || draft.path == null
+                || !draft.path.equals(recordingAudioFile.getAbsolutePath())) {
+            return false;
+        }
+        recordingGuid = guid;
+        recordReplyingMsg = replyToMsg;
+        recordReplyingTopMsg = replyToTopMsg;
+        recordReplyingStory = replyStory;
+        recordSendMessageChatArguments = sendMessageChatArguments;
+        recordMonoForumPeerId = monoForumPeerId;
+        recordMonoForumSuggestionParams = suggestionParams;
+        NotificationCenter.getInstance(recordingCurrentAccount).postNotificationName(NotificationCenter.recordPaused);
+        NotificationCenter.getInstance(recordingCurrentAccount).postNotificationName(NotificationCenter.audioDidSent, recordingGuid, recordingAudio, recordingAudioFile.getAbsolutePath(), true, draft.left, draft.right);
+        return true;
     }
 
     public void prepareResumedRecording(int currentAccount, MediaDataController.DraftVoice draft, long dialogId, MessageObject replyToMsg, MessageObject replyToTopMsg, TL_stories.StoryItem replyStory, int guid, SendMessageChatArguments sendMessageChatArguments, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        if (audioRecorderV2Active) {
+            // A paused V2 recording outlives the chat pause; show it again instead of rebuilding it.
+            if (showAudioRecorderV2Draft(draft, replyToMsg, replyToTopMsg, replyStory, guid, sendMessageChatArguments, monoForumPeerId, suggestionParams)
+                    || !releaseAudioRecorderV2ForNewRecording()) {
+                return;
+            }
+        }
         manualRecording = false;
         requestRecordAudioFocus(true);
         recordQueue.cancelRunnable(recordStartRunnable);
@@ -4931,6 +5047,10 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
 
             final TLRPC.TL_document audioToSend = recordingAudio;
             final File recordingAudioFileToSend = recordingAudioFile;
+            // Drafts written by the V2 recorder carry no recordSamples, so the file is the source of truth.
+            final byte[] fileWaveform = recordingAudioFileToSend.exists()
+                    ? getWaveform(recordingAudioFileToSend.getAbsolutePath())
+                    : null;
             AndroidUtilities.runOnUIThread(() -> {
                 boolean fileExist = recordingAudioFileToSend.exists();
                 if (!fileExist && BuildVars.DEBUG_VERSION) {
@@ -4940,7 +5060,9 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                 audioToSend.size = (int) recordingAudioFileToSend.length();
                 TLRPC.TL_documentAttributeAudio attributeAudio = new TLRPC.TL_documentAttributeAudio();
                 attributeAudio.voice = true;
-                attributeAudio.waveform = getWaveform2(recordSamples, recordSamples.length);
+                attributeAudio.waveform = fileWaveform != null
+                        ? fileWaveform
+                        : getWaveform2(recordSamples, recordSamples.length);
                 if (attributeAudio.waveform != null) {
                     attributeAudio.flags |= 4;
                 }
@@ -4954,8 +5076,8 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     }
 
     public boolean isRecordingPaused() {
-        if (audioRecorderV2Active && audioRecorderV2Controller != null) {
-            return audioRecorderV2Controller.isPreviewing();
+        if (audioRecorderV2Active) {
+            return audioRecorderV2Controller != null && audioRecorderV2Controller.isPreviewing();
         }
         return audioRecorderPaused;
     }
@@ -4994,9 +5116,12 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
 
     public void trimCurrentRecording(long startMs, long endMs, Runnable done) {
         if (audioRecorderV2Active) {
-            if (audioRecorderV2Controller != null
-                    && audioRecorderV2Controller.setTrimRange(startMs, endMs)
-                    && done != null) {
+            if (audioRecorderV2Controller == null
+                    || !audioRecorderV2Controller.setTrimRange(startMs, endMs)) {
+                FileLog.d("AudioRecorderV2 trim rejected: " + startMs + ".." + endMs);
+            }
+            // done resumes recording, so it must run even when the range was rejected, like legacy.
+            if (done != null) {
                 AndroidUtilities.runOnUIThread(done);
             }
             return;
@@ -5142,6 +5267,11 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             if (!NyaConfig.disableVibration.Bool()) feedbackView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
         } catch (Exception ignore) {}
 
+        if (audioRecorderV2Active && !releaseAudioRecorderV2ForNewRecording()) {
+            // Posted later, like legacy, so the caller has entered its recording state first.
+            AndroidUtilities.runOnUIThread(() -> NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.recordStartError, guid));
+            return;
+        }
         if (shouldUseAudioRecorderV2(currentAccount)) {
             startRecordingV2(
                     currentAccount,
@@ -6562,7 +6692,19 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
         return null;
     }
 
+    /** Re-query even when the number of selected items is unchanged. Called on the UI thread. */
+    public static void refreshGalleryAccess() {
+        galleryAccessGeneration++;
+        loadGalleryPhotosAlbums(0);
+    }
+
+    public static boolean hasCurrentGalleryAccess() {
+        return loadedGalleryAccess == VisualMediaAccess.current(ApplicationLoader.applicationContext);
+    }
+
     public static void loadGalleryPhotosAlbums(final int guid) {
+        final int access = VisualMediaAccess.current(ApplicationLoader.applicationContext);
+        final int generation = galleryAccessGeneration;
         Thread thread = new Thread(() -> {
             final ArrayList<AlbumEntry> mediaAlbumsSorted = new ArrayList<>();
             final ArrayList<AlbumEntry> photoAlbumsSorted = new ArrayList<>();
@@ -6583,15 +6725,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             Cursor cursor = null;
             try {
                 final Context context = ApplicationLoader.applicationContext;
-                if (
-                    Build.VERSION.SDK_INT < 23 ||
-                    Build.VERSION.SDK_INT < 33 && context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED ||
-                    Build.VERSION.SDK_INT >= 33 && (
-                        context.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED ||
-                        context.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED ||
-                        context.checkSelfPermission(Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
-                    )
-                ) {
+                if (VisualMediaAccess.canRead(access, true, false)) {
                     cursor = MediaStore.Images.Media.query(context.getContentResolver(), MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projectionPhotos, null, null, (Build.VERSION.SDK_INT > 28 ? MediaStore.Images.Media.DATE_MODIFIED : MediaStore.Images.Media.DATE_TAKEN) + " DESC");
                     if (cursor != null) {
                         int imageIdColumn = cursor.getColumnIndex(MediaStore.Images.Media._ID);
@@ -6679,15 +6813,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             try {
 
                 final Context context = ApplicationLoader.applicationContext;
-                if (
-                    Build.VERSION.SDK_INT < 23 ||
-                    Build.VERSION.SDK_INT < 33 && context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED ||
-                    Build.VERSION.SDK_INT >= 33 && (
-                        context.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED ||
-                        context.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED ||
-                        context.checkSelfPermission(Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
-                    )
-                ) {
+                if (VisualMediaAccess.canRead(access, false, true)) {
                     cursor = MediaStore.Images.Media.query(ApplicationLoader.applicationContext.getContentResolver(), MediaStore.Video.Media.EXTERNAL_CONTENT_URI, projectionVideo, null, null, (Build.VERSION.SDK_INT > 28 ? MediaStore.Video.Media.DATE_MODIFIED : MediaStore.Video.Media.DATE_TAKEN) + " DESC");
                     if (cursor != null) {
                         int imageIdColumn = cursor.getColumnIndex(MediaStore.Video.Media._ID);
@@ -6775,30 +6901,50 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                     return 0;
                 });
             }
-            broadcastNewPhotos(guid, mediaAlbumsSorted, photoAlbumsSorted, mediaCameraAlbumId, allMediaAlbum, allPhotosAlbum, allVideosAlbum, 0);
+            final Integer cameraId = mediaCameraAlbumId;
+            final AlbumEntry media = allMediaAlbum, photos = allPhotosAlbum, videos = allVideosAlbum;
+            AndroidUtilities.runOnUIThread(() -> broadcastNewPhotos(guid, mediaAlbumsSorted, photoAlbumsSorted,
+                    cameraId, media, photos, videos, access, generation, 0));
         });
         thread.setPriority(Thread.MIN_PRIORITY);
         thread.start();
     }
 
     public static boolean forceBroadcastNewPhotos;
-    private static void broadcastNewPhotos(final int guid, final ArrayList<AlbumEntry> mediaAlbumsSorted, final ArrayList<AlbumEntry> photoAlbumsSorted, final Integer cameraAlbumIdFinal, final AlbumEntry allMediaAlbumFinal, final AlbumEntry allPhotosAlbumFinal, final AlbumEntry allVideosAlbumFinal, int delay) {
-        if (broadcastPhotosRunnable != null) {
+    private static void broadcastNewPhotos(final int guid, final ArrayList<AlbumEntry> mediaAlbumsSorted, final ArrayList<AlbumEntry> photoAlbumsSorted, final Integer cameraAlbumIdFinal, final AlbumEntry allMediaAlbumFinal, final AlbumEntry allPhotosAlbumFinal, final AlbumEntry allVideosAlbumFinal, int access, int generation, int delay) {
+        if (!isCurrentGalleryAccess(access, generation)) {
+            if (guid != 0) loadGalleryPhotosAlbums(guid);
+            return;
+        }
+        if (guid == 0 && broadcastPhotosRunnable != null) {
             AndroidUtilities.cancelRunOnUIThread(broadcastPhotosRunnable);
         }
-        AndroidUtilities.runOnUIThread(broadcastPhotosRunnable = () -> {
+        Runnable publish = () -> {
+            if (!isCurrentGalleryAccess(access, generation)) {
+                if (guid != 0) loadGalleryPhotosAlbums(guid);
+                return;
+            }
             if (PhotoViewer.getInstance().isVisible() && !forceBroadcastNewPhotos) {
-                broadcastNewPhotos(guid, mediaAlbumsSorted, photoAlbumsSorted, cameraAlbumIdFinal, allMediaAlbumFinal, allPhotosAlbumFinal, allVideosAlbumFinal, 1000);
+                broadcastNewPhotos(guid, mediaAlbumsSorted, photoAlbumsSorted, cameraAlbumIdFinal,
+                        allMediaAlbumFinal, allPhotosAlbumFinal, allVideosAlbumFinal, access, generation, 1000);
                 return;
             }
             allMediaAlbums = mediaAlbumsSorted;
             allPhotoAlbums = photoAlbumsSorted;
-            broadcastPhotosRunnable = null;
+            if (guid == 0) broadcastPhotosRunnable = null;
+            loadedGalleryAccess = access;
             allPhotosAlbumEntry = allPhotosAlbumFinal;
             allMediaAlbumEntry = allMediaAlbumFinal;
             allVideosAlbumEntry = allVideosAlbumFinal;
             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.albumsDidLoad, guid, mediaAlbumsSorted, photoAlbumsSorted, cameraAlbumIdFinal);
-        }, delay);
+        };
+        if (guid == 0) broadcastPhotosRunnable = publish;
+        AndroidUtilities.runOnUIThread(publish, delay);
+    }
+
+    private static boolean isCurrentGalleryAccess(int access, int generation) {
+        return generation == galleryAccessGeneration
+                && access == VisualMediaAccess.current(ApplicationLoader.applicationContext);
     }
 
     public void scheduleVideoConvert(MessageObject messageObject) {
