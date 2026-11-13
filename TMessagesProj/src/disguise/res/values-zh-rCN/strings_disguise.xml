@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="NullgramDisguiseQQLabel">QQ</string>
+    <string name="NullgramDisguiseWechatLabel">微信</string>
+    <string name="NullgramDisguiseShandongtongLabel">山东通</string>
+</resources>
