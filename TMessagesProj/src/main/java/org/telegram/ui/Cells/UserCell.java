@@ -138,6 +138,7 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
     }
 
     private final int padding;
+    private boolean qqAppearance;
 
     public UserCell(Context context, int padding, int checkbox, boolean admin, boolean needAddButton, Theme.ResourcesProvider resourcesProvider) {
         this(context, padding, checkbox, admin, needAddButton, resourcesProvider, false);
@@ -145,6 +146,8 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
     public UserCell(Context context, int padding, int checkbox, boolean admin, boolean needAddButton, Theme.ResourcesProvider resourcesProvider, boolean needMutualIcon) {
         super(context);
         this.resourcesProvider = resourcesProvider;
+        qqAppearance = com.nullgram.client.appearance.QqPageStyle.isPalette(resourcesProvider);
+        if (qqAppearance) setBackgroundColor(com.nullgram.client.appearance.QqPageStyle.WHITE);
 
         int additionalPadding;
         if (needAddButton) {
@@ -259,6 +262,7 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
         setAvatarPadding(padding, 0);
     }
     public void setAvatarPadding(int padding, int paddingText) {
+        if (qqAppearance) padding = padding >= 58 ? 37 : 5;
         LayoutParams layoutParams = (LayoutParams) avatarImageView.getLayoutParams();
         layoutParams.leftMargin = dp(LocaleController.isRTL ? 0 : 7 + padding);
         layoutParams.rightMargin = dp(LocaleController.isRTL ? 7 + padding : 0);
@@ -513,9 +517,26 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        if (qqAppearance) {
+            float scale = com.nullgram.client.appearance.QqListStyle.fontScale(getContext());
+            nameTextView.setTypeface(android.graphics.Typeface.DEFAULT);
+            nameTextView.setTextSize((int) Math.ceil(17 * scale));
+            statusTextView.setTextSize((int) Math.ceil(13 * scale));
+            int row = com.nullgram.client.appearance.QqPageStyle.rowHeight(getContext());
+            LayoutParams avatar = (LayoutParams) avatarImageView.getLayoutParams();
+            avatar.width = avatar.height = dp(48);
+            avatar.topMargin = dp((row - 48) / 2f);
+            if (checkBox != null) ((LayoutParams) checkBox.getLayoutParams()).topMargin = avatar.topMargin + avatar.height - dp(20);
+            LayoutParams name = (LayoutParams) nameTextView.getLayoutParams();
+            LayoutParams status = (LayoutParams) statusTextView.getLayoutParams();
+            name.height = dp(23 * scale);
+            status.height = dp(19 * scale);
+            name.topMargin = dp((row - 44 * scale) / 2f);
+            status.topMargin = name.topMargin + name.height + dp(2);
+        }
         super.onMeasure(
             MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.EXACTLY),
-            MeasureSpec.makeMeasureSpec(dp(callCellStyle ? 56 : 58) + (needDivider ? 1 : 0), MeasureSpec.EXACTLY));
+            MeasureSpec.makeMeasureSpec(dp(qqAppearance ? com.nullgram.client.appearance.QqPageStyle.rowHeight(getContext()) : callCellStyle ? 56 : 58) + (needDivider ? 1 : 0), MeasureSpec.EXACTLY));
     }
 
     public void setStatusColors(int color, int onlineColor) {
@@ -532,6 +553,7 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
     }
 
     public void update(int mask) {
+        if ((mask & com.nullgram.client.appearance.LocalAvatarStore.CHANGE_MASK) != 0) mask = 0;
         TLRPC.FileLocation photo = null;
         String newName = null;
         TLRPC.User currentUser = null;

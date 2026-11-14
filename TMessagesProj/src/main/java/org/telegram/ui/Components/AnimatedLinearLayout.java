@@ -137,7 +137,7 @@ public class AnimatedLinearLayout extends LinearLayout {
             }
         }
         Collections.sort(visibleHolders, comparator);
-        listAnimator.reset(visibleHolders, !skipNextAnimation);
+        listAnimator.reset(visibleHolders, !skipNextAnimation && animateLayoutChanges());
         for (Holder holder : visibleHolders) {
             holder.hasInAnimator = true;
         }
@@ -145,6 +145,8 @@ public class AnimatedLinearLayout extends LinearLayout {
         skipNextAnimation = false;
         checkViewsVisibility();
     }
+
+    protected boolean animateLayoutChanges() { return true; }
 
     @Override
     public void onViewAdded(View child) {

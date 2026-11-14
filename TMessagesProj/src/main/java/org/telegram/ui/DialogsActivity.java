@@ -3158,8 +3158,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             animatedStatusView.setColor(getThemedColor(Theme.key_profile_verifiedBackground));
         }
         if (selectAnimatedEmojiDialog != null && selectAnimatedEmojiDialog.getContentView() instanceof SelectAnimatedEmojiDialog) {
-            SimpleTextView textView = actionBar.getTitleTextView();
-            ((SelectAnimatedEmojiDialog) selectAnimatedEmojiDialog.getContentView()).setScrimDrawable(textView != null && textView.getRightDrawable() == statusDrawable ? statusDrawable : null, textView);
+            configureStatusPopupScrim((SelectAnimatedEmojiDialog) selectAnimatedEmojiDialog.getContentView());
         }
     }
 
@@ -3320,8 +3319,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     public void setTitleOverlayText(String title, int titleId, Runnable action) {
         super.setTitleOverlayText(title, titleId, action);
         if (actionBar != null && selectAnimatedEmojiDialog != null && selectAnimatedEmojiDialog.getContentView() instanceof SelectAnimatedEmojiDialog) {
-            SimpleTextView textView = actionBar.getTitleTextView();
-            ((SelectAnimatedEmojiDialog) selectAnimatedEmojiDialog.getContentView()).setScrimDrawable(textView != null && textView.getRightDrawable() == statusDrawable ? statusDrawable : null, textView);
+            configureStatusPopupScrim((SelectAnimatedEmojiDialog) selectAnimatedEmojiDialog.getContentView());
         }
         if (dialogStoriesCell != null) {
             dialogStoriesCell.setTitleOverlayText(title, titleId);
@@ -6131,6 +6129,28 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         MessagesController.getGlobalMainSettings().edit().remove("cache_hint_showafter").remove("cache_hint_period").apply();
     }
 
+    private void configureStatusPopupScrim(SelectAnimatedEmojiDialog popup) {
+        if (qqListHeader != null && showQqListHeader()) {
+            // QQ owns the visible badge. The native scrim duplicates it at the hidden
+            // title's coordinates and steals its secondary invalidation parent.
+            popup.setScrimDrawable(null, null);
+        } else {
+            SimpleTextView title = actionBar.getTitleTextView();
+            popup.setScrimDrawable(title != null && title.getRightDrawable() == statusDrawable ? statusDrawable : null, title);
+        }
+    }
+
+    private void positionQqStatusAnimation() {
+        if (qqListHeader != null && showQqListHeader() && animatedStatusView != null
+                && animatedStatusView.getParent() instanceof View
+                && qqListHeader.getStatusBounds((View) animatedStatusView.getParent(), AndroidUtilities.rectTmp2)) {
+            // Window coordinates already contain the current scroll translation.
+            animatedStatusView.translateY2(scrollYOffset);
+            animatedStatusView.translate(AndroidUtilities.rectTmp2.exactCenterX(),
+                    AndroidUtilities.rectTmp2.exactCenterY() - scrollYOffset);
+        }
+    }
+
     public void showSelectStatusDialog() {
         if (selectAnimatedEmojiDialog != null || SharedConfig.appLocked || (hasStories && !dialogStoriesCell.isExpanded())) {
             return;
@@ -6140,7 +6160,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         int xoff = 0, yoff = 0;
         boolean hasEmoji = false;
         SimpleTextView actionBarTitle = actionBar.getTitleTextView();
-        if (actionBarTitle != null && actionBarTitle.getRightDrawable() != null) {
+        if (qqListHeader != null && showQqListHeader()
+                && qqListHeader.getStatusBounds(actionBar, AndroidUtilities.rectTmp2)) {
+            statusDrawable.play();
+            hasEmoji = statusDrawable.getDrawable() instanceof AnimatedEmojiDrawable;
+            yoff = -(actionBar.getHeight() - AndroidUtilities.rectTmp2.centerY()) - dp(16);
+            xoff = AndroidUtilities.rectTmp2.centerX() - dp(16);
+            positionQqStatusAnimation();
+        } else if (actionBarTitle != null && actionBarTitle.getRightDrawable() != null) {
             statusDrawable.play();
             hasEmoji = statusDrawable.getDrawable() instanceof AnimatedEmojiDrawable;
             AndroidUtilities.rectTmp2.set(actionBarTitle.getRightDrawable().getBounds());
@@ -6199,6 +6226,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 }
                 getMessagesController().updateEmojiStatus(emojiStatus, gift);
                 if (documentId != null) {
+                    positionQqStatusAnimation();
                     animatedStatusView.animateChange(ReactionsLayoutInBubble.VisibleReaction.fromCustomEmoji(documentId));
                 }
                 if (popup[0] != null) {
@@ -6216,7 +6244,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             popupLayout.setSelected(statusDrawable.getDrawable() instanceof AnimatedEmojiDrawable ? ((AnimatedEmojiDrawable) statusDrawable.getDrawable()).getDocumentId() : null);
         }
         popupLayout.setSaveState(1);
-        popupLayout.setScrimDrawable(statusDrawable, actionBarTitle);
+        configureStatusPopupScrim(popupLayout);
         popup[0] = selectAnimatedEmojiDialog = new SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow(popupLayout, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT) {
             @Override
             public void dismiss() {

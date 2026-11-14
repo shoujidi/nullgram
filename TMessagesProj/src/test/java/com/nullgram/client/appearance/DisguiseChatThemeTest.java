@@ -142,6 +142,18 @@ public class DisguiseChatThemeTest {
         assertEquals(255, android.graphics.Color.alpha(palette.getColor(Theme.key_chat_serviceBackground)));
     }
 
+    @Test public void wallpaperPriorityHonorsChatThenCustomGlobalAndRestoresDefault() {
+        android.graphics.drawable.Drawable chat = new android.graphics.drawable.ColorDrawable(0xff123456);
+        android.graphics.drawable.Drawable global = new android.graphics.drawable.ColorDrawable(0xffabcdef);
+        android.graphics.drawable.Drawable fallback = new DisguiseChatTheme.Palette().wallpaper;
+        assertSame(chat, DisguiseChatTheme.selectWallpaper(chat, global, true, fallback));
+        assertSame(chat, DisguiseChatTheme.selectWallpaper(chat, global, false, fallback));
+        assertSame(global, DisguiseChatTheme.selectWallpaper(null, global, true, fallback));
+        assertSame(fallback, DisguiseChatTheme.selectWallpaper(null, global, false, fallback));
+        assertSame(fallback, DisguiseChatTheme.selectWallpaper(null, null, true, fallback));
+        assertEquals(0xffabcdef, ((android.graphics.drawable.ColorDrawable) global).getColor());
+    }
+
     @Test public void sharedDividerIsClonedWithoutGlobalColorOrShaderMutation() {
         android.graphics.Paint saved = Theme.dividerPaint;
         try {

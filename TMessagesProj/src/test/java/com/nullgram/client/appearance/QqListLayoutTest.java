@@ -144,6 +144,45 @@ public class QqListLayoutTest {
         assertEquals(oldMargin, MainTabsHelper.getMainTabsMargin());
         for (String key : before.keySet()) if (!key.equals("nullgramDisguiseListTheme")) assertEquals(before.get(key), prefs.getAll().get(key));
     }
+    @Test public void tabCentersStayInTheirFourSlotsAfterResizeAndRtl() {
+        for (boolean rtl : new boolean[]{false, true}) {
+            LocaleController.isRTL = rtl;
+            MainTabsLayout tabs = tabs(context(1), 0);
+            for (int width : new int[]{360, 600, 280, 361}) {
+                layout(tabs, width, QqListStyle.NAV_HEIGHT);
+                int slot = 0;
+                for (int index : new int[]{0, 1, 3, 4}) {
+                    View child = tabs.getChildAt(index);
+                    float expected = width * (slot++ + .5f) / 4;
+                    if (rtl) expected = width - expected;
+                    assertEquals(expected, child.getX() + child.getWidth() / 2f, 1f);
+                    assertTrue(child.getX() >= 0 && child.getX() + child.getWidth() <= width);
+                    assertEquals(1f, child.getScaleX(), 0);
+                }
+            }
+        }
+    }
+
+    @Test public void qqStatusMapsConnectionStatesWithoutClaimingUnknownIsOnline() {
+        QqListHeader header = header(context(1));
+        TextView status = (TextView) header.getChildAt(3);
+        int[][] states = {
+            {3, org.telegram.messenger.R.string.NullgramQqConnected},
+            {2, org.telegram.messenger.R.string.NullgramQqOffline},
+            {1, org.telegram.messenger.R.string.Connecting},
+            {4, org.telegram.messenger.R.string.Connecting},
+            {5, org.telegram.messenger.R.string.NullgramQqSyncing},
+            {0, org.telegram.messenger.R.string.NullgramQqOffline}
+        };
+        for (int[] state : states) {
+            header.setConnectionState(state[0]);
+            assertEquals(LocaleController.getString(state[1]), status.getText().toString());
+        }
+        assertTrue(androidx.core.graphics.ColorUtils.calculateContrast(status.getCurrentTextColor(), android.graphics.Color.WHITE) >= 4.5);
+        assertTrue(androidx.core.graphics.ColorUtils.calculateContrast(QqTabPainter.LABEL_NORMAL, 0xfffafafa) >= 4.5);
+        assertTrue(androidx.core.graphics.ColorUtils.calculateContrast(QqTabPainter.LABEL_ACTIVE, 0xfffafafa) >= 4.5);
+    }
+
     @Test public void qqRowMeasuresAsTwoLinesWithoutChangingNativeThreeLinePreference() {
         boolean previous = org.telegram.messenger.SharedConfig.useThreeLinesLayout;
         try {

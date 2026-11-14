@@ -878,6 +878,11 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             dialogsActivity.setMainTabsActivityController(new MainTabsActivityControllerImpl());
             return dialogsActivity;
         } else if (position == MainTabsHelper.getProfilePosition()) {
+            if (com.nullgram.client.appearance.DisguiseListTheme.isQq()) {
+                BaseFragment me = new com.nullgram.client.appearance.QqMeActivity();
+                me.setCurrentAccount(currentAccount);
+                return me;
+            }
             Bundle args = new Bundle();
             args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
             args.putBoolean("my_profile", true);

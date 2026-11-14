@@ -245,6 +245,8 @@ public class MainTabsLayout extends AnimatedLinearLayout {
         }
     }
 
+    @Override protected boolean animateLayoutChanges() { return !qqAppearance; }
+
     @Override
     protected void setChildVisibilityFactor(View view, float factor) {
         final float s = lerp(0.7f, 1f, factor);
@@ -266,6 +268,21 @@ public class MainTabsLayout extends AnimatedLinearLayout {
     }
 
     private void checkVisualWidth() {
+        if (qqAppearance && tabsLeftPos != null && getWidth() > 0) {
+            for (int i = 0; i < getChildCount(); i++) {
+                View child = getChildAt(i);
+                if (!isViewVisible(child)) continue;
+                int left = org.telegram.messenger.LocaleController.isRTL
+                        ? getWidth() - getPaddingRight() - tabsLeftPos[i] - child.getMeasuredWidth()
+                        : getPaddingLeft() + tabsLeftPos[i];
+                child.layout(left, getPaddingTop(), left + child.getMeasuredWidth(), getPaddingTop() + child.getMeasuredHeight());
+                child.setTranslationX(0);
+                child.setAlpha(1);
+                child.setScaleX(1); child.setScaleY(1);
+                ((GlassTabView) child).setVisualWidth(child.getMeasuredWidth());
+            }
+            return;
+        }
         for (int a = 0, N = getEntriesCount(); a < N; a++) {
             final ListAnimator.Entry<Holder> entry = getEntry(a);
             final float width = entry.getRectF().width();

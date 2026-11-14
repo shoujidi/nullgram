@@ -434,6 +434,7 @@ public class ImageReceiver implements NotificationCenter.NotificationCenterDeleg
         }
         isAvatar = true;
         setUseRoundForThumbDrawable(true);
+        if (com.nullgram.client.appearance.LocalAvatarStore.apply(this, currentAccount, object, avatarDrawable, big)) return;
         BitmapDrawable strippedBitmap = null;
         boolean hasStripped = false;
         ImageLocation videoLocation = null;

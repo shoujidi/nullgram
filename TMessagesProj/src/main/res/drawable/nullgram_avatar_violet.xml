@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="128dp" android:height="128dp" android:viewportWidth="256" android:viewportHeight="256">
+    <!-- Original Nullgram chibi portrait, drawn as static vector artwork. -->
+    <path android:fillColor="#EBE4FF" android:pathData="M0,0 H256 V256 H0 Z"/>
+    <path android:fillColor="#59466F" android:pathData="M46,106 C39,37 83,24 127,27 C184,19 215,59 211,117 L219,215 Q128,241 38,215 Z"/>
+    <path android:fillColor="#C0A5EB" android:pathData="M32,256 C35,212 76,202 104,198 H153 C185,203 221,215 225,256 Z"/>
+    <path android:fillColor="#FFE2CC" android:pathData="M109,170 H147 V207 Q129,225 109,207 Z"/>
+    <path android:fillColor="#FFF0E3" android:pathData="M61,96 C60,61 91,49 127,49 C164,49 194,67 195,101 L191,145 C187,178 159,195 128,196 C97,194 70,177 64,147 Z"/>
+    <path android:fillColor="#59466F" android:pathData="M49,105 C48,45 85,30 128,32 C177,28 211,62 207,111 C187,100 168,77 158,62 C144,83 119,97 87,106 L90,80 Q75,102 49,116 Z"/>
+    <path android:fillColor="#573C3C" android:pathData="M79,121 Q92,109 106,122 Q93,117 79,126 Z M151,121 Q165,109 179,122 L179,126 Q165,117 151,121 Z"/>
+    <path android:fillColor="#71528F" android:pathData="M82,130 C82,115 103,115 103,130 L103,140 C103,153 82,153 82,140 Z M154,130 C154,115 175,115 175,130 L175,140 C175,153 154,153 154,140 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M86,125 A4,5 0,1 0,94 125 A4,5 0,1 0,86 125 M158,125 A4,5 0,1 0,166 125 A4,5 0,1 0,158 125"/>
+    <path android:fillColor="#F7B2AD" android:fillAlpha="0.65" android:pathData="M70,153 A13,5 0,1 0,96 153 A13,5 0,1 0,70 153 M160,153 A13,5 0,1 0,186 153 A13,5 0,1 0,160 153"/>
+    <path android:fillColor="#00000000" android:strokeColor="#B56D6D" android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M119,168 Q128,175 137,168"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M89,206 L111,215 L128,234 L145,215 L165,206 L155,230 L128,241 L100,230 Z"/>
+</vector>

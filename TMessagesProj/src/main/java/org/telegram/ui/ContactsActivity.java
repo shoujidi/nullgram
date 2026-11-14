@@ -305,6 +305,7 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
 
         searchField = new FragmentSearchField(context, resourceProvider);
         searchField.setSectionBackground();
+        if (usesQqHome()) searchField.setQqAppearance(true);
         searchField.setPivotY(0);
         final ActionBarMenu actionMode = actionBar.createActionMode(false, null);
         actionMode.setBackgroundColor(0);
@@ -344,6 +345,10 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
                     listViewAdapter.setSortType(sortByName ? 1 : 2, false);
                     sortItem.setIcon(sortByName ? R.drawable.msg_contacts_time : R.drawable.msg_contacts_name);
                 } else if (id == search_button) {
+                    if (usesQqHome()) {
+                        if (floatingButton != null) floatingButton.performClick();
+                        return;
+                    }
                     listView.smoothScrollToPosition(0);
 //                    animatorSearchFieldVisible.setValue(true, true);
 //                    animatorSearchFieldHeight.animateTo(dp(DialogsActivity.SEARCH_FIELD_HEIGHT));
@@ -357,8 +362,8 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
 
         ActionBarMenu menu = actionBar.createMenu();
 
-        searchItem = menu.addItem(search_button, R.drawable.outline_header_search);
-        searchItem.setContentDescription(getString(R.string.SearchContacts));
+        searchItem = menu.addItem(search_button, usesQqHome() ? R.drawable.nullgram_qq_add : R.drawable.outline_header_search);
+        searchItem.setContentDescription(getString(usesQqHome() ? R.string.CreateNewContact : R.string.SearchContacts));
 
         searchField.editText.addTextChangedListener(new SearchTextWatcher(searchField.editText, new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
             @Override
@@ -953,6 +958,7 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
             floatingButton.setAnimation(R.raw.write_contacts_fab_icon, 44);
             floatingButton.imageView.getAnimatedDrawable().setCurrentFrame(floatingButton.imageView.getAnimatedDrawable().getFramesCount() - 1);
             floatingButton.setContentDescription(getString(R.string.CreateNewContact));
+            if (usesQqHome()) floatingButton.setVisibility(View.GONE);
         }
 
         if (initialSearchString != null) {
@@ -967,7 +973,7 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
         contentView.addView(headerShadowView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 5, Gravity.TOP));
 
         actionBar.setAdaptiveBackground(listView);
-        actionBar.setDrawBlurBackground(contentView);
+        if (!usesQqHome()) actionBar.setDrawBlurBackground(contentView);
 
 //        animatorSearchFieldHeight.forceFactor(dp(DialogsActivity.SEARCH_FIELD_HEIGHT));
         animatorSearchFieldVisible.setValue(true, false);
@@ -995,7 +1001,9 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
 
     @Override
     public ActionBar createActionBar(Context context) {
+        resourceProvider = com.nullgram.client.appearance.QqPageStyle.wrap(resourceProvider, usesQqHome());
         ActionBar actionBar = super.createActionBar(context);
+        if (usesQqHome()) com.nullgram.client.appearance.QqPageStyle.header(actionBar);
         actionBar.setUseContainerForTitles();
         actionBar.getTitlesContainer().setTranslationX(dp(4));
         actionBar.setAddToContainer(false);
@@ -1437,6 +1445,7 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
     @Override
     public ArrayList<ThemeDescription> getThemeDescriptions() {
         ArrayList<ThemeDescription> themeDescriptions = new ArrayList<>();
+        if (usesQqHome()) return themeDescriptions;
 
         ThemeDescription.ThemeDescriptionDelegate cellDelegate = () -> {
             if (listView != null) {
@@ -1660,6 +1669,10 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
     }
 
     private void checkUi_searchButton() {
+        if (usesQqHome()) {
+            FragmentFloatingButton.setAnimatedVisibility(searchItem, actionBar.isActionModeShowed() ? 0 : 1);
+            return;
+        }
         final float factor1 = 1f - animatorSearchFieldVisible.getFloatValue();
         final float factor2 = 1f - animatorSearchHasQuery.getFloatValue();
         final float factor = factor1 * factor2;
@@ -1673,6 +1686,10 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
     }
 
     private void checkUi_floatingButtonVisible() {
+        if (usesQqHome()) {
+            if (floatingButton != null) floatingButton.setVisibility(View.GONE);
+            return;
+        }
         if (floatingButton != null && listViewAdapter != null) {
             floatingButton.setButtonVisible(floatingButtonVisibleByScroll && !searching && !listViewAdapter.isEmpty(), true);
         }
@@ -1681,6 +1698,10 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
 
 
     /* Blur */
+    private boolean usesQqHome() {
+        return com.nullgram.client.appearance.QqPageStyle.enabled(hasMainTabs)
+                && !createSecretChat && !returnAsResult && !destroyAfterSelect;
+    }
 
     private final @Nullable DownscaleScrollableNoiseSuppressor scrollableViewNoiseSuppressor;
     private final @Nullable BlurredBackgroundSourceRenderNode iBlur3SourceGlassFrosted;

@@ -59,7 +59,20 @@ public final class DisguiseChatTheme {
                 && (!ChatObject.isChannel(chat) || chat.megagroup);
     }
 
-    public static final class Palette implements Theme.ResourcesProvider {
+    public interface StyledResources extends Theme.ResourcesProvider {
+        boolean usesQqAppearance();
+    }
+
+    public static boolean usesQqAppearance(Theme.ResourcesProvider provider) {
+        return provider instanceof StyledResources && ((StyledResources) provider).usesQqAppearance();
+    }
+
+    public static Drawable selectWallpaper(Drawable chat, Drawable global, boolean customGlobal, Drawable fallback) {
+        return chat != null ? chat : customGlobal && global != null ? global : fallback;
+    }
+
+    public static final class Palette implements StyledResources {
+        @Override public boolean usesQqAppearance() { return true; }
         private final SparseIntArray colors = new SparseIntArray();
         private final HashMap<String, Drawable> drawables = new HashMap<>();
         private final HashMap<String, Paint> paints = new HashMap<>();
@@ -77,7 +90,7 @@ public final class DisguiseChatTheme {
             put(OUTGOING, Theme.key_chat_outBubble, Theme.key_chat_messagePanelSend,
                     Theme.key_chat_messagePanelCursor, Theme.key_chat_inReplyLine,
                     Theme.key_chat_inReplyNameText, Theme.key_chat_messageLinkIn,
-                    Theme.key_chat_inSiteNameText);
+                    Theme.key_chat_inSiteNameText, Theme.key_chat_botButtonText);
             put(SECONDARY, Theme.key_chat_inTimeText, Theme.key_chat_inTimeSelectedText,
                     Theme.key_actionBarDefaultSubtitle, Theme.key_chat_messagePanelHint,
                     Theme.key_chat_serviceText, Theme.key_chat_inReplyMessageText);

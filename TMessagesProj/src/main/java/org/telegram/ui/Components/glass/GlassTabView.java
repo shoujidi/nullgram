@@ -169,7 +169,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
     @Override
     protected void dispatchDraw(@NonNull Canvas canvas) {
         if (qqAppearance) {
-            qqPainter.draw(canvas, hasVisualWidth ? visualWidth : getWidth(), getHeight(), qqKind,
+            qqPainter.draw(canvas, getWidth(), getHeight(), qqKind,
                     hasGestureSelectedOverride ? gestureSelectedOverride : isSelectedAnimator.getFloatValue(), qqBadge);
             return;
         }
