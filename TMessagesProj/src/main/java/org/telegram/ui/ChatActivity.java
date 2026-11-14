@@ -20069,7 +20069,7 @@ public class ChatActivity extends BaseFragment implements
         }
 
         protected boolean getNewDrawableMotion() {
-            if (usesQqChatTheme()) return false;
+            if (usesQqChatTheme()) return themeDelegate.isWallpaperMotion();
             if (themeDelegate.wallpaper == null) {
                 return super.getNewDrawableMotion();
             }
@@ -23644,6 +23644,15 @@ public class ChatActivity extends BaseFragment implements
             if ((updateMask & MessagesController.UPDATE_MASK_AVATAR) != 0 || (updateMask & MessagesController.UPDATE_MASK_CHAT_AVATAR) != 0 || (updateMask & MessagesController.UPDATE_MASK_NAME) != 0) {
                 checkAndUpdateAvatar();
                 updateVisibleRows();
+                if ((updateMask & com.nullgram.client.appearance.LocalAvatarStore.CHANGE_MASK) != 0 && chatListView != null) {
+                    // Message/remote-photo identities are unchanged for a local override,
+                    // so setMessageObject may legitimately skip rebinding its avatar.
+                    for (int i = 0; i < chatListView.getChildCount(); i++) {
+                        if (chatListView.getChildAt(i) instanceof ChatMessageCell cell) {
+                            cell.setAvatar(cell.getMessageObject());
+                        }
+                    }
+                }
             }
             if ((updateMask & MessagesController.UPDATE_MASK_USER_PRINT) != 0) {
                 updateSubtitle = true;
@@ -46320,7 +46329,13 @@ public class ChatActivity extends BaseFragment implements
 
     public Runnable onThemeChange;
 
-    public class ThemeDelegate implements Theme.ResourcesProvider, ChatActionCell.ThemeDelegate, MessagePreviewView.ResourcesDelegate {
+    public class ThemeDelegate implements DisguiseChatTheme.StyledResources, ChatActionCell.ThemeDelegate, MessagePreviewView.ResourcesDelegate {
+        @Override public boolean usesQqAppearance() { return usesQqChatTheme(); }
+
+        private boolean hasCustomGlobalWallpaper() {
+            Theme.OverrideWallpaperInfo override = Theme.getActiveTheme().overrideWallpaper;
+            return override != null && !override.isDefault();
+        }
         private DisguiseChatTheme.Palette qqPalette;
 
         private DisguiseChatTheme.Palette getQqPalette() {
@@ -46505,13 +46520,17 @@ public class ChatActivity extends BaseFragment implements
 
         @Override
         public Drawable getWallpaperDrawable() {
-            if (getQqPalette() != null) return qqPalette.wallpaper;
+            if (getQqPalette() != null) return DisguiseChatTheme.selectWallpaper(backgroundDrawable,
+                    Theme.getCachedWallpaperNonBlocking(), hasCustomGlobalWallpaper(), qqPalette.wallpaper);
             return backgroundDrawable != null ? backgroundDrawable : Theme.getCachedWallpaperNonBlocking();
         }
 
         @Override
         public boolean isWallpaperMotion() {
-            if (usesQqChatTheme()) return false;
+            if (usesQqChatTheme()) {
+                if (wallpaper != null) return wallpaper.settings != null && wallpaper.settings.motion;
+                return backgroundDrawable == null && hasCustomGlobalWallpaper() && Theme.isWallpaperMotion();
+            }
             return chatTheme != null ? false : Theme.isWallpaperMotion();
         }
 
@@ -47147,7 +47166,7 @@ public class ChatActivity extends BaseFragment implements
 
     private void updateBackground() {
         if (contentView != null && usesQqChatTheme()) {
-            contentView.setBackgroundImage(themeDelegate.getWallpaperDrawable(), false);
+            contentView.setBackgroundImage(themeDelegate.getWallpaperDrawable(), themeDelegate.isWallpaperMotion());
             return;
         }
         if (contentView == null || parentThemeDelegate != null) {

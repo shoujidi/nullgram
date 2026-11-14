@@ -3323,6 +3323,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     }
 
     public boolean update(int mask, boolean animated) {
+        if ((mask & com.nullgram.client.appearance.LocalAvatarStore.CHANGE_MASK) != 0) mask = 0;
         boolean requestLayout = false;
         boolean rebuildLayout = false;
         boolean invalidate = false;

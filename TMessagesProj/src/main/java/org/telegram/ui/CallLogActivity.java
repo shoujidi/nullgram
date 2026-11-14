@@ -232,7 +232,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 			});
 
 			emptyTextView1 = new TextView(context);
-			emptyTextView1.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+			emptyTextView1.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
 			emptyTextView1.setText(getString(R.string.MakeYourFirstCall));
 			emptyTextView1.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
 			emptyTextView1.setTypeface(AndroidUtilities.bold());
@@ -245,7 +245,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 				help = help.replace('\n', ' ');
 			}
 			emptyTextView2.setText(help);
-			emptyTextView2.setTextColor(Theme.getColor(Theme.key_emptyListPlaceholder));
+			emptyTextView2.setTextColor(getThemedColor(Theme.key_emptyListPlaceholder));
 			emptyTextView2.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
 			emptyTextView2.setGravity(Gravity.CENTER);
 			emptyTextView2.setLineSpacing(AndroidUtilities.dp(2), 1);
@@ -466,14 +466,17 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		private final ImageView imageView;
 		private final ProfileSearchCell profileSearchCell;
 		private final CheckBox2 checkBox;
+		private final boolean qqAppearance;
 
-		public CallCell(Context context, int currentAccount) {
+		public CallCell(Context context, int currentAccount, Theme.ResourcesProvider resourcesProvider) {
 			super(context);
 			this.currentAccount = currentAccount;
+			qqAppearance = com.nullgram.client.appearance.QqPageStyle.isPalette(resourcesProvider);
 
-			profileSearchCell = new ProfileSearchCell(context);
+			profileSearchCell = new ProfileSearchCell(context, resourcesProvider);
 			profileSearchCell.setCallCellStyle();
-			profileSearchCell.setPadding(LocaleController.isRTL ? AndroidUtilities.dp(32) : 0, 0, LocaleController.isRTL ? 0 : AndroidUtilities.dp(32), 0);
+			int buttonSpace = dp(qqAppearance ? 44 : 32);
+			profileSearchCell.setPadding(LocaleController.isRTL ? buttonSpace : 0, 0, LocaleController.isRTL ? 0 : buttonSpace, 0);
 			profileSearchCell.setSublabelOffset(AndroidUtilities.dp(LocaleController.isRTL ? 2 : -2), -AndroidUtilities.dp(7));
 			addView(profileSearchCell, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
@@ -486,14 +489,14 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 			addView(avatarsImageView, LayoutHelper.createFrame(72, LayoutHelper.MATCH_PARENT, LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT, -2, 0, 0, 0));
 
 			imageView = new ImageView(context);
-			imageView.setColorFilter(Theme.getColor(Theme.key_telegram_color_text), PorterDuff.Mode.SRC_IN);
-			imageView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector), 1));
+			imageView.setColorFilter(Theme.getColor(Theme.key_telegram_color_text, resourcesProvider), PorterDuff.Mode.SRC_IN);
+			imageView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector, resourcesProvider), 1));
 			imageView.setScaleType(ImageView.ScaleType.CENTER);
 			imageView.setContentDescription(getString(R.string.Call));
 			addView(imageView, LayoutHelper.createFrame(48, 48, (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.CENTER_VERTICAL, 8, 0, 8, 0));
 
-			checkBox = new CheckBox2(context, 21);
-			checkBox.getCheckBoxBase().setBackgroundColor(Theme.getColor(Theme.key_telegram_color));
+			checkBox = new CheckBox2(context, 21, resourcesProvider);
+			checkBox.getCheckBoxBase().setBackgroundColor(Theme.getColor(Theme.key_telegram_color, resourcesProvider));
 			checkBox.setColor(-1, Theme.key_windowBackgroundWhite, Theme.key_checkboxCheck);
 			checkBox.setDrawUnchecked(false);
 			checkBox.setDrawBackgroundAsArc(3);
@@ -530,6 +533,13 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 				case TYPE_MISSED_OUT:
 					subtitle.setSpan(iconMissedOut(getContext()), ldir.length(), ldir.length() + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 					break;
+			}
+			if (qqAppearance) {
+				int tint = row.type == TYPE_MISSED_IN || row.type == TYPE_MISSED_OUT
+						? 0xffdf4052 : com.nullgram.client.appearance.QqPageStyle.SECONDARY;
+				for (ImageSpan span : subtitle.getSpans(0, subtitle.length(), ImageSpan.class)) {
+					span.getDrawable().setColorFilter(new PorterDuffColorFilter(tint, PorterDuff.Mode.SRC_IN));
+				}
 			}
 			StringBuilder sb = null;
 			if (row.call_id != 0) {
@@ -600,7 +610,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 
 			@Override
 			public CallCell createView(Context context, RecyclerListView listView, int currentAccount, int classGuid, Theme.ResourcesProvider resourcesProvider) {
-				return new CallCell(context, currentAccount);
+				return new CallCell(context, currentAccount, resourcesProvider);
 			}
 
 			@Override
@@ -626,14 +636,14 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		private final ProgressButton button;
 		private TLRPC.Chat currentChat;
 
-		public GroupCallCell(Context context) {
+		public GroupCallCell(Context context, Theme.ResourcesProvider resourcesProvider) {
 			super(context);
 
 			String text = getString(R.string.VoipChatJoin);
 			button = new ProgressButton(context);
 			int width = (int) Math.ceil(button.getPaint().measureText(text));
 
-			profileSearchCell = new ProfileSearchCell(context);
+			profileSearchCell = new ProfileSearchCell(context, resourcesProvider);
 			profileSearchCell.setCallCellStyle();
 			profileSearchCell.setPadding(LocaleController.isRTL ? (AndroidUtilities.dp(28 + 16) + width) : 0, 0, LocaleController.isRTL ? 0 : (AndroidUtilities.dp(28 + 16) + width), 0);
 			profileSearchCell.setSublabelOffset(0, -AndroidUtilities.dp(4));
@@ -641,9 +651,9 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 
 			button.setText(text);
 			button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-			button.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
-			button.setProgressColor(Theme.getColor(Theme.key_featuredStickers_buttonProgress));
-			button.setBackgroundRoundRect(Theme.getColor(Theme.key_telegram_color), Theme.getColor(Theme.key_featuredStickers_addButtonPressed), 16);
+			button.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText, resourcesProvider));
+			button.setProgressColor(Theme.getColor(Theme.key_featuredStickers_buttonProgress, resourcesProvider));
+			button.setBackgroundRoundRect(Theme.getColor(Theme.key_telegram_color, resourcesProvider), Theme.getColor(Theme.key_featuredStickers_addButtonPressed, resourcesProvider), 16);
 			button.setPadding(AndroidUtilities.dp(14), 0, AndroidUtilities.dp(14), 0);
 			addView(button, LayoutHelper.createFrameRelatively(LayoutHelper.WRAP_CONTENT, 28, Gravity.TOP | Gravity.END, 0, 16, 14, 0));
 		}
@@ -676,7 +686,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 
 			@Override
 			public GroupCallCell createView(Context context, RecyclerListView listView, int currentAccount, int classGuid, Theme.ResourcesProvider resourcesProvider) {
-				return new GroupCallCell(context);
+				return new GroupCallCell(context, resourcesProvider);
 			}
 
 			@Override
@@ -754,7 +764,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		});
 
 		ActionBarMenu menu = actionBar.createMenu();
-		otherItem = menu.addItem(10, R.drawable.ic_ab_other);
+		otherItem = menu.addItem(10, usesQqHome() ? R.drawable.nullgram_qq_add : R.drawable.ic_ab_other);
 		otherItem.setContentDescription(getString(R.string.AccDescrMoreOptions));
 		otherItem.setOnClickListener(v -> showItemOptions());
 
@@ -842,11 +852,11 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		}));
 
 		fragmentView = contentView;
-		fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
+		fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
 
 		flickerLoadingView = new FlickerLoadingView(context);
 		flickerLoadingView.setViewType(FlickerLoadingView.CALL_LOG_TYPE);
-		flickerLoadingView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
+		flickerLoadingView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
 		flickerLoadingView.showDate(false);
 		emptyView = new EmptyTextProgressView(context, flickerLoadingView);
 		contentView.addView(emptyView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
@@ -933,7 +943,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		headerShadowView.setShadowVisible(false, false);
 		contentView.addView(headerShadowView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 5, Gravity.TOP));
 
-		actionBar.setDrawBlurBackground(contentView);
+		if (!usesQqHome()) actionBar.setDrawBlurBackground(contentView);
 		actionBar.setAdaptiveBackground(listView);
 
 		Bulletin.addDelegate(this, new Bulletin.Delegate() {
@@ -964,7 +974,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 
 		if (hasActiveCalls || hasCalls) {
 			items.add(UItem.asButton(ID_CREATE_CALL, R.drawable.menu_call_create, getString(R.string.GroupCallCreate2)).accent());
-			if (hasVisibleBottomNavigationBar && !getUserConfig().showCallsTab) {
+			if (!usesQqHome() && hasVisibleBottomNavigationBar && !getUserConfig().showCallsTab) {
 				items.add(UItem.asButton(ID_SHOW_IN_MAIN_TABS, R.drawable.menu_add_tab_24, getString(R.string.GroupCallShowInMainTabs)).accent());
 			}
 			items.add(UItem.asShadow(null));
@@ -1145,7 +1155,9 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 
 	@Override
 	public ActionBar createActionBar(Context context) {
+		resourceProvider = com.nullgram.client.appearance.QqPageStyle.wrap(resourceProvider, usesQqHome());
 		ActionBar actionBar = super.createActionBar(context);
+		if (usesQqHome()) com.nullgram.client.appearance.QqPageStyle.header(actionBar);
 		actionBar.setUseContainerForTitles();
 		actionBar.createAdditionalSubTitleOverlayContainer();
 		actionBar.getAdditionalSubTitleOverlayContainer().setTranslationX(dp(4));
@@ -1262,7 +1274,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		selectedDialogsCountTextView = new NumberTextView(actionMode.getContext());
 		selectedDialogsCountTextView.setTextSize(18);
 		selectedDialogsCountTextView.setTypeface(AndroidUtilities.bold());
-		selectedDialogsCountTextView.setTextColor(Theme.getColor(Theme.key_actionBarActionModeDefaultIcon));
+		selectedDialogsCountTextView.setTextColor(getThemedColor(Theme.key_actionBarActionModeDefaultIcon));
 		actionMode.addView(selectedDialogsCountTextView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1.0f, hasMainTabs ? 18 : 72, 0, 0, 0));
 		selectedDialogsCountTextView.setOnTouchListener((v, event) -> true);
 
@@ -1539,6 +1551,8 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
         floatingButton.setTranslationY(-navigationBarHeight - additionFloatingButtonOffset - additionalFloatingTranslation);
 	}
 
+	private boolean usesQqHome() { return com.nullgram.client.appearance.QqPageStyle.enabled(hasMainTabs); }
+
 	private void checkUi_listViewPadding() {
 		listView.setPadding(
 			0,
@@ -1578,6 +1592,8 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 	@Override
 	public ArrayList<ThemeDescription> getThemeDescriptions() {
         ArrayList<ThemeDescription> themeDescriptions = new ArrayList<>();
+		// This page owns a fixed palette; global theme transitions must not recolor it.
+		if (usesQqHome()) return themeDescriptions;
 
         ThemeDescription.ThemeDescriptionDelegate cellDelegate = () -> {
 			if (listView != null) {

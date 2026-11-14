@@ -75,9 +75,11 @@ public class SearchAdapter extends RecyclerListView.SelectionAdapter {
     private String lastQuery;
     public boolean includeSearch;
     public boolean includeLoading;
+    private final Theme.ResourcesProvider resourcesProvider;
 
     public SearchAdapter(RecyclerListView listView, Context context, LongSparseArray<TLRPC.User> arg1, LongSparseArray<TLRPC.User> selected, boolean usernameSearch, boolean mutual, boolean chats, boolean bots, boolean self, boolean phones, int searchChannelId, Theme.ResourcesProvider resourcesProvider) {
         mContext = context;
+        this.resourcesProvider = resourcesProvider;
         ignoreUsers = arg1;
         selectedUsers = selected;
         onlyMutual = mutual;
@@ -343,13 +345,14 @@ public class SearchAdapter extends RecyclerListView.SelectionAdapter {
 
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        Theme.ResourcesProvider qq = com.nullgram.client.appearance.QqPageStyle.isPalette(resourcesProvider) ? resourcesProvider : null;
         View view;
         switch (viewType) {
             case 0:
                 if (useUserCell) {
-                    view = new UserCell(mContext, 1, 1, false);
+                    view = new UserCell(mContext, 1, 1, false, qq);
                 } else {
-                    ProfileSearchCell cell = new ProfileSearchCell(mContext);
+                    ProfileSearchCell cell = new ProfileSearchCell(mContext, qq);
                     cell.setCallCellStyle();
                     view = cell;
                 }
@@ -383,7 +386,7 @@ public class SearchAdapter extends RecyclerListView.SelectionAdapter {
                 view = new TextCell(mContext, 16, false);
                 break;
             case 3:
-                ProfileSearchCell cell = new ProfileSearchCell(mContext);
+                ProfileSearchCell cell = new ProfileSearchCell(mContext, qq);
                 cell.setCallCellStyle();
                 view = cell;
                 break;

@@ -1,12 +1,16 @@
 package com.nullgram.client.appearance;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
@@ -39,11 +43,33 @@ public final class QqListHeader extends FrameLayout {
         title = label(context, 18, DisguiseListTheme.TEXT);
         title.setOnClickListener(v -> openAccount.run());
         addView(title);
-        badge = new ImageView(context);
+        badge = new ImageView(context) {
+            @Override protected void onDraw(Canvas canvas) {
+                Drawable drawable = getDrawable();
+                if (drawable == null) return;
+                Rect bounds = drawable.getBounds();
+                if (bounds.isEmpty()) return;
+                // Map the native title's shared geometry into this badge's own canvas.
+                // Do not mutate bounds here: that also invalidates the other host.
+                float scale = Math.min(getWidth() / (float) bounds.width(), getHeight() / (float) bounds.height());
+                int save = canvas.save();
+                try {
+                    canvas.translate((getWidth() - bounds.width() * scale) / 2f,
+                            (getHeight() - bounds.height() * scale) / 2f);
+                    canvas.scale(scale, scale);
+                    canvas.translate(-bounds.left, -bounds.top);
+                    drawable.draw(canvas);
+                } finally {
+                    canvas.restoreToCount(save);
+                }
+            }
+        };
         badge.setScaleType(ImageView.ScaleType.FIT_CENTER);
         badge.setVisibility(GONE);
         addView(badge);
-        connection = label(context, 12, DisguiseListTheme.GRAY);
+        connection = label(context, 12, 0xff535d6b);
+        connection.setOnClickListener(v -> Toast.makeText(context,
+                LocaleController.getString(R.string.NullgramQqStatusInfo), Toast.LENGTH_LONG).show());
         addView(connection);
         dot = new View(context);
         dot.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
@@ -85,16 +111,37 @@ public final class QqListHeader extends FrameLayout {
     }
 
     public void setConnectionState(int state) {
-        int label = R.string.Connecting;
-        if (state == ConnectionsManager.ConnectionStateConnected) label = R.string.NullgramQqConnected;
-        else if (state == ConnectionsManager.ConnectionStateWaitingForNetwork) label = R.string.WaitingForNetwork;
-        else if (state == ConnectionsManager.ConnectionStateConnectingToProxy) label = R.string.ConnectingToProxy;
-        else if (state == ConnectionsManager.ConnectionStateUpdating) label = R.string.Updating;
+        int label = R.string.NullgramQqOffline;
+        int color = 0xff64748b;
+        if (state == ConnectionsManager.ConnectionStateConnected) {
+            label = R.string.NullgramQqConnected; color = 0xff168447;
+        } else if (state == ConnectionsManager.ConnectionStateConnecting
+                || state == ConnectionsManager.ConnectionStateConnectingToProxy) {
+            label = R.string.Connecting; color = 0xff996000;
+        } else if (state == ConnectionsManager.ConnectionStateUpdating) {
+            label = R.string.NullgramQqSyncing; color = 0xff996000;
+        }
         connection.setText(LocaleController.getString(label));
+        connection.setContentDescription(connection.getText() + ". " + LocaleController.getString(R.string.NullgramQqStatusInfo));
         GradientDrawable shape = new GradientDrawable();
         shape.setShape(GradientDrawable.OVAL);
-        shape.setColor(state == ConnectionsManager.ConnectionStateConnected ? 0xff25c86e : 0xffb0b0b0);
+        shape.setColor(color);
         dot.setBackground(shape);
+    }
+
+    /** Visible badge bounds in the requested host's coordinates, including translations. */
+    public boolean getStatusBounds(View relativeTo, Rect out) {
+        if (getVisibility() != VISIBLE || badge.getVisibility() != VISIBLE
+                || statusDrawable == null || statusDrawable.getDrawable() == null
+                || badge.getWidth() == 0 || badge.getHeight() == 0) return false;
+        int[] badgeLocation = new int[2];
+        int[] hostLocation = new int[2];
+        badge.getLocationInWindow(badgeLocation);
+        relativeTo.getLocationInWindow(hostLocation);
+        int left = badgeLocation[0] - hostLocation[0];
+        int top = badgeLocation[1] - hostLocation[1];
+        out.set(left, top, left + badge.getWidth(), top + badge.getHeight());
+        return true;
     }
 
     @Override protected void onAttachedToWindow() {

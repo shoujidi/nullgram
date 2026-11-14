@@ -86,6 +86,8 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
     private AvatarDrawable avatarDrawable;
     private CharSequence subLabel;
     private Theme.ResourcesProvider resourcesProvider;
+    private final boolean qqAppearance;
+    private int qqStatusTop;
     private TLRPC.TL_sponsoredPeer ad;
 
     private TLRPC.User user;
@@ -159,6 +161,11 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
     public ProfileSearchCell(Context context, Theme.ResourcesProvider resourcesProvider) {
         super(context);
         this.resourcesProvider = resourcesProvider;
+        qqAppearance = com.nullgram.client.appearance.QqPageStyle.isPalette(resourcesProvider);
+        if (qqAppearance) {
+            customPaints = true;
+            setBackgroundColor(com.nullgram.client.appearance.QqPageStyle.WHITE);
+        }
 
         avatarImage = new ImageReceiver(this);
         avatarImage.setRoundRadius(dp(23));
@@ -393,7 +400,9 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
         if (checkBox != null) {
             checkBox.measure(MeasureSpec.makeMeasureSpec(dp(24), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(dp(24), MeasureSpec.EXACTLY));
         }
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), callCellStyle ? dp(56) : (dp(60) + (useSeparator ? 1 : 0)));
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), qqAppearance
+                ? dp(com.nullgram.client.appearance.QqPageStyle.rowHeight(getContext()))
+                : callCellStyle ? dp(56) : (dp(60) + (useSeparator ? 1 : 0)));
     }
 
     @Override
@@ -403,7 +412,7 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
         }
         if (checkBox != null) {
             int x = LocaleController.isRTL ? (right - left) - dp(42) : dp(42);
-            int y = dp(36);
+            int y = qqAppearance ? (getMeasuredHeight() + dp(52)) / 2 - dp(22) : dp(36);
             checkBox.layout(x, y, x + checkBox.getMeasuredWidth(), y + checkBox.getMeasuredHeight());
         }
         if (changed) {
@@ -545,7 +554,8 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
                 namePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
                 namePaint.setTypeface(AndroidUtilities.bold());
             }
-            namePaint.setTextSize(dp(callCellStyle ? 15 : 16));
+            namePaint.setTextSize(qqAppearance ? com.nullgram.client.appearance.QqListStyle.sp(getContext(), 17) : dp(callCellStyle ? 15 : 16));
+            if (qqAppearance) namePaint.setTypeface(android.graphics.Typeface.DEFAULT);
             if (encryptedChat != null) {
                 namePaint.setColor(Theme.getColor(Theme.key_chats_secretName, resourcesProvider));
             } else {
@@ -711,7 +721,7 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
             if (statusPaint == null) {
                 statusPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
             }
-            statusPaint.setTextSize(dp(callCellStyle ? 13f : 15));
+            statusPaint.setTextSize(qqAppearance ? com.nullgram.client.appearance.QqListStyle.sp(getContext(), 13) : dp(callCellStyle ? 13f : 15));
             if (currentStatusPaint == Theme.dialogs_offlinePaint) {
                 statusPaint.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText3, resourcesProvider));
             } else if (currentStatusPaint == Theme.dialogs_onlinePaint) {
@@ -737,6 +747,15 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
             avatarLeft = dp(callCellStyle ? 14 : rectangularAvatar ? 15 : 11) + getPaddingLeft();
         }
         avatarStoryParams.originalAvatarRect.set(avatarLeft, dp(callCellStyle ? 6 : 7), avatarLeft + dp(callCellStyle ? 44 : rectangularAvatar ? 42 : 46), dp(callCellStyle ? 6 : 7) + dp(callCellStyle ? 44 : 46));
+        if (qqAppearance) {
+            int x = LocaleController.isRTL ? getMeasuredWidth() - dp(64) - getPaddingRight() : dp(12) + getPaddingLeft();
+            int y = (getMeasuredHeight() - dp(52)) / 2;
+            avatarStoryParams.originalAvatarRect.set(x, y, x + dp(52), y + dp(52));
+            int textHeight = nameLayout.getHeight() + (statusLayout == null ? 0 : dp(3) + statusLayout.getHeight());
+            nameTop = Math.max(dp(6), (getMeasuredHeight() - textHeight) / 2);
+            nameLockTop = nameTop;
+            qqStatusTop = nameTop + nameLayout.getHeight() + dp(3);
+        }
 
         double widthpx;
         float left;
@@ -828,6 +847,7 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
     }
 
     public void update(int mask) {
+        if ((mask & com.nullgram.client.appearance.LocalAvatarStore.CHANGE_MASK) != 0) mask = 0;
         TLRPC.FileLocation photo = null;
         if (user != null) {
             avatarDrawable.setInfo(currentAccount, user);
@@ -845,9 +865,12 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
                         thumb = user.photo.strippedBitmap;
                     }
                 }
-                avatarImage.setImage(ImageLocation.getForUserOrChat(currentAccount, user, ImageLocation.TYPE_SMALL), "50_50", ImageLocation.getForUserOrChat(user, ImageLocation.TYPE_STRIPPED), "50_50", thumb, user, 0);
+                if (!com.nullgram.client.appearance.LocalAvatarStore.apply(avatarImage, currentAccount, user, avatarDrawable, false)) {
+                    avatarImage.setImage(ImageLocation.getForUserOrChat(currentAccount, user, ImageLocation.TYPE_SMALL), "50_50", ImageLocation.getForUserOrChat(user, ImageLocation.TYPE_STRIPPED), "50_50", thumb, user, 0);
+                }
             }
         } else if (chat != null) {
+            avatarDrawable.setInfo(currentAccount, chat);
             Drawable thumb = avatarDrawable;
             if (chat.photo != null) {
                 photo = chat.photo.photo_small;
@@ -855,7 +878,9 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
                     thumb = chat.photo.strippedBitmap;
                 }
             }
-            if (chat.monoforum) {
+            if (com.nullgram.client.appearance.LocalAvatarStore.apply(avatarImage, currentAccount, chat, avatarDrawable, false)) {
+                // The local display avatar takes precedence over the server thumbnail.
+            } else if (chat.monoforum) {
                 ForumUtilities.setMonoForumAvatar(currentAccount, chat, avatarDrawable, avatarImage);
             } else {
                 avatarDrawable.setInfo(currentAccount, chat);
@@ -1029,7 +1054,7 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
 
         if (statusLayout != null) {
             canvas.save();
-            canvas.translate(statusLeft + sublabelOffsetX, dp(callCellStyle ? 35 : 33) + sublabelOffsetY);
+            canvas.translate(statusLeft + sublabelOffsetX, qqAppearance ? qqStatusTop : dp(callCellStyle ? 35 : 33) + sublabelOffsetY);
             statusLayout.draw(canvas);
             canvas.restore();
         }

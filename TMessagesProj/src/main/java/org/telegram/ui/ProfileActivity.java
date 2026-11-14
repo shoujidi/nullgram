@@ -11801,7 +11801,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (avatar == null) {
                 avatarsViewPager.initIfEmpty(vectorAvatarThumbDrawable, imageLocation, thumbLocation, reload);
             }
-            if (avatarBig == null) {
+            if (avatarBig == null && !com.nullgram.client.appearance.LocalAvatarStore.apply(
+                    avatarImage.getImageReceiver(), currentAccount, user, avatarDrawable, true)) {
                 if (vectorAvatar != null) {
                     avatarImage.setImageDrawable(vectorAvatarThumbDrawable);
                 } else if (videoThumbLocation != null && !user.photo.personal) {
@@ -12393,7 +12394,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             } else {
                 filter = null;
             }
-            if (avatarBig == null && !isTopic) {
+            if (avatarBig == null && !isTopic && !com.nullgram.client.appearance.LocalAvatarStore.apply(
+                    avatarImage.getImageReceiver(), currentAccount, chat, avatarDrawable, true)) {
                 avatarImage.setImage(videoLocation, filter, thumbLocation, "50_50", avatarDrawable, chat);
             }
             if (imageLocation != null && (prevLoadedImageLocation == null || imageLocation.photoId != prevLoadedImageLocation.photoId)) {

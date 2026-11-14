@@ -13,6 +13,8 @@ import org.telegram.messenger.R;
 
 /** Static QQ 9.2.15 artwork, with a lightweight selection crossfade driven by the existing tab animator. */
 public final class QqTabPainter {
+    public static final int LABEL_NORMAL = 0xff535d6b;
+    public static final int LABEL_ACTIVE = 0xff0060bb;
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint text = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Drawable[][] icons = new Drawable[4][2];
@@ -38,7 +40,11 @@ public final class QqTabPainter {
     public void draw(Canvas canvas, float width, float height, int kind, float selection, String badge) {
         float d = AndroidUtilities.density;
         float selected = Math.max(0, Math.min(1, selection));
-        int iconSize = AndroidUtilities.dp(29), top = AndroidUtilities.dp(3);
+        text.setTextSize(QqListStyle.sp(context, 12));
+        text.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+        int iconSize = AndroidUtilities.dp(40);
+        float textHeight = text.descent() - text.ascent();
+        int top = Math.max(0, Math.round((height - iconSize - textHeight) / 2));
         int left = Math.round((width - iconSize) / 2);
         for (int state = 0; state < 2; state++) {
             Drawable icon = icons[slot(kind)][state];
@@ -46,14 +52,13 @@ public final class QqTabPainter {
             icon.setAlpha(Math.round(255 * (state == 0 ? 1 - selected : selected)));
             icon.draw(canvas);
         }
-        int normal = 0xff8b8d99, active = DisguiseListTheme.BLUE;
+        int normal = LABEL_NORMAL, active = LABEL_ACTIVE;
         text.setColor(Color.rgb(Math.round(Color.red(normal) + (Color.red(active) - Color.red(normal)) * selected),
                 Math.round(Color.green(normal) + (Color.green(active) - Color.green(normal)) * selected),
                 Math.round(Color.blue(normal) + (Color.blue(active) - Color.blue(normal)) * selected)));
-        text.setTextSize(QqListStyle.sp(context, 11));
         text.setTextAlign(Paint.Align.CENTER);
         CharSequence fitted = TextUtils.ellipsize(label(kind), text, Math.max(1, width - 8 * d), TextUtils.TruncateAt.END);
-        float baseline = Math.min(height - 4 * d - text.descent(), 35 * d - text.ascent());
+        float baseline = Math.min(height - 2 * d - text.descent(), top + iconSize - text.ascent());
         canvas.drawText(fitted.toString(), width / 2, baseline, text);
         if (!TextUtils.isEmpty(badge)) {
             text.setTextSize(QqListStyle.sp(context, 10));
@@ -61,7 +66,7 @@ public final class QqTabPainter {
             float h = Math.max(16 * d, text.descent() - text.ascent() + 2 * d);
             float w = Math.max(h, text.measureText(value) + 8 * d);
             float x = Math.min(width - w - 2 * d, width / 2 + 7 * d), y = 2 * d;
-            fill.setColor(DisguiseListTheme.RED);
+            fill.setColor(0xffc6312b);
             canvas.drawRoundRect(x, y, x + w, y + h, h / 2, h / 2, fill);
             text.setColor(DisguiseListTheme.WHITE);
             canvas.drawText(value, x + w / 2, y + h / 2 - (text.ascent() + text.descent()) / 2, text);

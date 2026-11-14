@@ -41,6 +41,13 @@ public class LetterSectionCell extends FrameLayout {
         textView.setText(letter.toUpperCase());
     }
 
+    public void setQqAppearance() {
+        setLayoutParams(new ViewGroup.LayoutParams(dp(38), dp(com.nullgram.client.appearance.QqPageStyle.rowHeight(getContext()))));
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        textView.setTextColor(com.nullgram.client.appearance.QqPageStyle.SECONDARY);
+        textView.setLayoutParams(LayoutHelper.createFrame(-1, -1));
+    }
+
     public void setCellHeight(int height) {
         setLayoutParams(new ViewGroup.LayoutParams(dp(54), height));
     }

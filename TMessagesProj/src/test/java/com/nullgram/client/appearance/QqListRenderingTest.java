@@ -52,7 +52,7 @@ public class QqListRenderingTest {
         int row = 0;
         for (int selected : new int[]{0, 1, 3, 4}) {
             MainTabsLayout tabs = QqListLayoutTest.tabs(context, selected);
-            QqListLayoutTest.layout(tabs, 360, 54);
+            QqListLayoutTest.layout(tabs, 360, QqListStyle.navigationHeight(context));
             canvas.save(); canvas.translate(0, 160 + row++ * 72); tabs.draw(canvas); canvas.restore();
         }
         Context large = QqListLayoutTest.context(1.6f);

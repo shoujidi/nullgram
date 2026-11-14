@@ -38,6 +38,9 @@ import top.nkbe.niagram.helpers.LocalNameHelper;
 
 /** Queries only local preferences. Opening a chosen chat uses the existing chat navigation. */
 public class LocalAliasSearchActivity extends BaseFragment {
+    private final boolean management;
+    public LocalAliasSearchActivity() { this(false); }
+    public LocalAliasSearchActivity(boolean management) { this.management = management; }
     private long owner;
     private boolean opening;
     private EditTextBoldCursor search;
@@ -46,19 +49,41 @@ public class LocalAliasSearchActivity extends BaseFragment {
     private final SharedPreferences.OnSharedPreferenceChangeListener changes = (prefs, key) -> {
         if (key == null || LocalNameHelper.isAliasKey(key)) refresh();
     };
+    private final SharedPreferences.OnSharedPreferenceChangeListener avatarChanges = (prefs, key) -> refresh();
 
     @Override public View createView(Context context) {
         owner = getUserConfig().getClientUserId();
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
-        actionBar.setTitle(LocaleController.getString(R.string.NullgramAliasSearch));
+        actionBar.setTitle(LocaleController.getString(management ? R.string.NullgramAliasManage : R.string.NullgramAliasSearch));
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
-            @Override public void onItemClick(int id) { if (id == -1) finishFragment(); }
+            @Override public void onItemClick(int id) {
+                if (id == -1) finishFragment();
+                else if (id == 1) {
+                    LocalAliasPickerActivity picker = new LocalAliasPickerActivity();
+                    picker.setCurrentAccount(currentAccount);
+                    presentFragment(picker);
+                } else if (id == 2) {
+                    showDialog(new AlertDialog.Builder(getParentActivity(), getResourceProvider())
+                            .setTitle(LocaleController.getString(R.string.NullgramDisguiseImport))
+                            .setMessage(LocaleController.getString(R.string.NullgramDisguiseImportConfirm))
+                            .setPositiveButton(LocaleController.getString(R.string.OK), (dialog, which) -> {
+                                if (!validOwner()) return;
+                                LocalNameHelper.importLegacyNames(currentAccount);
+                                actionBar.createMenu().getItem(2).setVisibility(View.GONE);
+                                refresh();
+                            }).setNegativeButton(LocaleController.getString(R.string.Cancel), null).create());
+                }
+            }
         });
+        if (management) {
+            actionBar.createMenu().addItem(1, R.drawable.msg_add).setContentDescription(LocaleController.getString(R.string.NullgramDisguiseAlias));
+            actionBar.createMenu().addItem(2, R.drawable.msg_download).setContentDescription(LocaleController.getString(R.string.NullgramDisguiseImport));
+        }
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
         TextView hint = new TextView(context);
-        hint.setText(LocaleController.getString(R.string.NullgramAliasSearchHint));
+        hint.setText(LocaleController.getString(management ? R.string.NullgramAliasManageHint : R.string.NullgramAliasSearchHint));
         hint.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText2));
         hint.setTextSize(14);
         hint.setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(12), AndroidUtilities.dp(20), AndroidUtilities.dp(8));
@@ -98,18 +123,30 @@ public class LocalAliasSearchActivity extends BaseFragment {
         };
         list.setAdapter(adapter);
         list.setOnItemClickListener((view, position) -> {
-            if (position >= 0 && position < results.size()) open(results.get(position).peer());
+            if (position >= 0 && position < results.size()) open(results.get(position).peer(), management);
         });
         list.setOnItemLongClickListener((view, position) -> {
             if (position < 0 || position >= results.size() || !validOwner()) return false;
             LocalNameHelper.Alias alias = results.get(position);
             showDialog(new AlertDialog.Builder(getParentActivity(), getResourceProvider())
-                    .setTitle(LocaleController.getString(R.string.NullgramRestoreName))
-                    .setMessage(alias.name())
-                    .setPositiveButton(LocaleController.getString(R.string.OK), (dialog, which) -> {
-                        if (validOwner()) LocalNameHelper.set(currentAccount, alias.peer(), null);
-                        refresh();
-                    }).setNegativeButton(LocaleController.getString(R.string.Cancel), null).create());
+                    .setTitle(alias.name())
+                    .setItems(new CharSequence[]{LocaleController.getString(R.string.Edit),
+                            LocaleController.getString(R.string.NullgramRestoreName),
+                            LocaleController.getString(R.string.NullgramAvatarRestore),
+                            LocaleController.getString(R.string.NullgramAliasOpenChat)}, (dialog, which) -> {
+                        if (!validOwner()) return;
+                        if (which == 0) open(alias.peer(), true);
+                        else if (which == 1) { LocalNameHelper.set(currentAccount, alias.peer(), null); refresh(); }
+                        else if (which == 3) open(alias.peer());
+                        else {
+                            org.telegram.messenger.Utilities.globalQueue.postRunnable(() -> {
+                                boolean saved = LocalAvatarStore.save(currentAccount, owner, alias.peer(), null, "");
+                                AndroidUtilities.runOnUIThread(() -> {
+                                    if (saved && validOwner()) { LocalAvatarStore.refresh(currentAccount); refresh(); }
+                                });
+                            });
+                        }
+                    }).create());
             return true;
         });
         rows.addView(list, new FrameLayout.LayoutParams(-1, -1));
@@ -131,27 +168,36 @@ public class LocalAliasSearchActivity extends BaseFragment {
 
     private void refresh() {
         if (adapter == null) return;
-        results = validOwner() ? LocalNameHelper.search(currentAccount, search.getText().toString()) : Collections.emptyList();
+        results = validOwner() ? LocalAvatarStore.search(currentAccount, search.getText().toString()) : Collections.emptyList();
         adapter.notifyDataSetChanged();
     }
 
     @Override public void onResume() {
         super.onResume();
+        if (management && actionBar != null) actionBar.createMenu().getItem(2).setVisibility(
+                validOwner() && LocalNameHelper.hasLegacyNames() ? View.VISIBLE : View.GONE);
         NyaConfig.getPreferences().registerOnSharedPreferenceChangeListener(changes);
+        LocalAvatarStore.preferences().registerOnSharedPreferenceChangeListener(avatarChanges);
         refresh();
     }
 
     @Override public void onPause() {
         NyaConfig.getPreferences().unregisterOnSharedPreferenceChangeListener(changes);
+        LocalAvatarStore.preferences().unregisterOnSharedPreferenceChangeListener(avatarChanges);
         super.onPause();
     }
 
     @Override public void onFragmentDestroy() {
         NyaConfig.getPreferences().unregisterOnSharedPreferenceChangeListener(changes);
+        LocalAvatarStore.preferences().unregisterOnSharedPreferenceChangeListener(avatarChanges);
         super.onFragmentDestroy();
     }
 
     private void open(long peer) {
+        open(peer, false);
+    }
+
+    private void open(long peer, boolean edit) {
         if (!validOwner() || opening) return;
         opening = true;
         AndroidUtilities.hideKeyboard(search);
@@ -171,6 +217,7 @@ public class LocalAliasSearchActivity extends BaseFragment {
                 }
                 if (user != null) controller.putUser(user, true);
                 if (chat != null) controller.putChat(chat, true);
+                if (edit) { LocalAliasEditor.show(this, currentAccount, peer); return; }
                 Bundle args = new Bundle();
                 args.putLong(peer > 0 ? "user_id" : "chat_id", Math.abs(peer));
                 if (controller.checkCanOpenChat(args, this)) {

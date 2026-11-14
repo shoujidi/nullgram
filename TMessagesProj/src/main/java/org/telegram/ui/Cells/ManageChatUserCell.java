@@ -230,6 +230,7 @@ public class ManageChatUserCell extends FrameLayout {
     }
 
     public void update(int mask) {
+        if ((mask & com.nullgram.client.appearance.LocalAvatarStore.CHANGE_MASK) != 0) mask = 0;
         if (currentObject == null) {
             return;
         }

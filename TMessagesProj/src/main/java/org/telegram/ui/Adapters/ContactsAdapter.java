@@ -72,6 +72,10 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
     public boolean isEmptyWithMainTabs;
 
     BaseFragment fragment;
+    private Theme.ResourcesProvider qqProvider() {
+        Theme.ResourcesProvider provider = fragment == null ? null : fragment.getResourceProvider();
+        return com.nullgram.client.appearance.QqPageStyle.isPalette(provider) ? provider : null;
+    }
 
     public ContactsAdapter(Context context, BaseFragment fragment, int onlyUsersType, boolean showPhoneBook, LongSparseArray<TLRPC.User> usersToIgnore, LongSparseArray<TLRPC.User> selectedContacts, int flags) {
         mContext = context;
@@ -386,6 +390,7 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
             view = new LetterSectionCell(mContext);
         }
         LetterSectionCell cell = (LetterSectionCell) view;
+        if (qqProvider() != null) cell.setQqAppearance();
         if (sortType == SORT_TYPE_BY_TIME || disableSections || isEmpty) {
             cell.setLetter("");
         } else {
@@ -430,7 +435,7 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
                 break;
             }
             case HEADER_CELL: {
-                view = new HeaderCell(mContext, Theme.key_windowBackgroundWhiteBlueHeader, 21, 14, 5, false, null);
+                view = new HeaderCell(mContext, Theme.key_windowBackgroundWhiteBlueHeader, 21, 14, 5, false, qqProvider());
                 break;
             }
             case SEARCH_CELL: {
@@ -448,13 +453,13 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
                 break;
             }
             case USER_CELL: {
-                UserCell cell = new UserCell(mContext, 58, 1, false, false, null, true);
+                UserCell cell = new UserCell(mContext, 58, 1, false, false, qqProvider(), true);
                 cell.setCallCellStyle(58);
                 view = cell;
                 break;
             }
             case TEXT_CELL: {
-                view = new TextCell(mContext);
+                view = new TextCell(mContext, qqProvider());
                 break;
             }
             case GRAY_CELL:

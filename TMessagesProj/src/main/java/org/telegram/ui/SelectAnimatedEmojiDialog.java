@@ -1344,7 +1344,8 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
     @Override
     protected void dispatchDraw(Canvas canvas) {
         if (scrimDrawable != null && emojiX != null) {
-            Rect bounds = scrimDrawable.getBounds();
+            // getBounds() exposes the mutable internal Rect; save a value copy.
+            Rect bounds = scrimDrawable.copyBounds();
             float scale = scrimDrawableParent == null ? 1f : scrimDrawableParent.getScaleY();
             int wasAlpha = 255;
             wasAlpha = scrimDrawable.getAlpha();

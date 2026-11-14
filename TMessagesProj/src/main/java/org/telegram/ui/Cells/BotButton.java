@@ -8,6 +8,10 @@ import android.animation.ValueAnimator;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
+import com.nullgram.client.appearance.DisguiseChatTheme;
+import com.nullgram.client.appearance.QqInlineButtonStyle;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.view.animation.OvershootInterpolator;
@@ -52,6 +56,8 @@ class BotButton {
     public boolean isInviteButton;
     public boolean isLocked;
 
+    private int iconTint;
+    private PorterDuffColorFilter iconFilter;
     private final Path path = new Path();
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF loadingRect = new RectF();
@@ -79,28 +85,37 @@ class BotButton {
     ) {
         boolean invalidate = false;
         final float s = getPressScale();
+        final boolean qq = DisguiseChatTheme.usesQqAppearance(resourcesProvider);
 
         canvas.save();
         if (s != 1) {
             canvas.scale(s, s, rect.centerX(), rect.centerY());
         }
-        Arrays.fill(radii, dp(Math.min(6.75f, SharedConfig.bubbleRadius)));
-        if (hasPositionFlag(MessageObject.POSITION_FLAG_LEFT | MessageObject.POSITION_FLAG_BOTTOM)) {
+        Arrays.fill(radii, dp(qq ? 10 : Math.min(6.75f, SharedConfig.bubbleRadius)));
+        if (!qq && hasPositionFlag(MessageObject.POSITION_FLAG_LEFT | MessageObject.POSITION_FLAG_BOTTOM)) {
             radii[6] = radii[7] = dp(SharedConfig.bubbleRadius);
         }
-        if (hasPositionFlag(MessageObject.POSITION_FLAG_RIGHT | MessageObject.POSITION_FLAG_BOTTOM)) {
+        if (!qq && hasPositionFlag(MessageObject.POSITION_FLAG_RIGHT | MessageObject.POSITION_FLAG_BOTTOM)) {
             radii[4] = radii[5] = dp(SharedConfig.bubbleRadius);
         }
 
         path.rewind();
         path.addRoundRect(rect, radii, Path.Direction.CW);
-        canvas.drawPath(path, Theme.getThemePaint(Theme.key_paint_chatActionBackground, resourcesProvider));
+        if (!qq) canvas.drawPath(path, Theme.getThemePaint(Theme.key_paint_chatActionBackground, resourcesProvider));
 
         final BotInlineKeyboard.BackgroundColor bgColor =
             buttonImpl != null ? buttonImpl.getColor() :
             BotInlineKeyboard.BackgroundColor.NONE;
 
-        if (bgColor != BotInlineKeyboard.BackgroundColor.NONE) {
+        if (qq) {
+            paint.setColor(QqInlineButtonStyle.background(bgColor, pressed));
+            canvas.drawPath(path, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(AndroidUtilities.density);
+            paint.setColor(QqInlineButtonStyle.BORDER);
+            canvas.drawPath(path, paint);
+            paint.setStyle(Paint.Style.FILL);
+        } else if (bgColor != BotInlineKeyboard.BackgroundColor.NONE) {
             switch (bgColor) {
                 case DANGER:
                     paint.setColor(Theme.multAlpha(Theme.getColor(Theme.key_botKeyboard_button_danger, resourcesProvider), 0.7f));
@@ -115,7 +130,7 @@ class BotButton {
             canvas.drawPath(path, paint);
         }
         final boolean hasGradientService = resourcesProvider != null ? resourcesProvider.hasGradientService() : Theme.hasGradientService();
-        if (hasGradientService && (bgColor == BotInlineKeyboard.BackgroundColor.NONE || resourcesProvider != null && resourcesProvider.isDark())) {
+        if (!qq && hasGradientService && (bgColor == BotInlineKeyboard.BackgroundColor.NONE || resourcesProvider != null && resourcesProvider.isDark())) {
             canvas.drawPath(path, Theme.chat_actionBackgroundGradientDarkenPaint);
         }
 
@@ -171,7 +186,16 @@ class BotButton {
         canvas.restore();
 
         canvas.save();
+        final int foreground = qq ? QqInlineButtonStyle.text(bgColor) : 0xffffffff;
+        if (iconFilter == null || iconTint != foreground) {
+            iconTint = foreground;
+            iconFilter = new PorterDuffColorFilter(foreground, PorterDuff.Mode.SRC_IN);
+            if (iconDrawable != null) iconDrawable = iconDrawable.mutate();
+        }
+        if (iconDrawable != null) iconDrawable.setColorFilter(iconFilter);
+        if (animatedEmojiDrawable != null) animatedEmojiDrawable.setColorFilter(iconFilter);
         int iconWithMarginPx = iconDrawable != null || animatedEmojiDrawable != null ? dp(24 + 2) : 0;
+        if (qq) title.ellipsize(Math.max(1, rect.width() - dp(24) - iconWithMarginPx));
         float titleX = rect.left + (rect.width() - (title.getWidth() + (iconDrawable != null ? dp(4): 0)) - iconWithMarginPx) / 2f;
         if (animatedEmojiDrawable != null) {
             final int top = (int) (rect.centerY() - dp(20) / 2f);
@@ -196,8 +220,14 @@ class BotButton {
             iconDrawable.draw(canvas);
             titleX += iconWithMarginPx;
         }
-        title.ellipsize(Math.max(1, rect.width() - dp(15) - iconWithMarginPx));
-        title.draw(canvas, titleX, rect.centerY(), isLocked ? 0.5f: 1f);
+        if (!qq) title.ellipsize(Math.max(1, rect.width() - dp(15) - iconWithMarginPx));
+        if (qq) {
+            int savedColor = title.paint.getColor();
+            title.draw(canvas, titleX, rect.centerY(), foreground, 1f);
+            title.paint.setColor(savedColor);
+        } else {
+            title.draw(canvas, titleX, rect.centerY(), isLocked ? 0.5f: 1f);
+        }
         canvas.restore();
 
         final TL_keyboard.TL_inlineButtonTypeUrl buttonTypeUrl = TLKeyboardHelper.getType(button, TL_keyboard.TL_inlineButtonTypeUrl.class);

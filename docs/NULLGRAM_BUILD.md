@@ -11,7 +11,7 @@ The provided debug APK uses a local development signing key. Recipients build wi
 - Android SDK platform `android-37.0`, Build Tools `37.0.0`.
 - NDK `27.2.12479018`, CMake `3.31.6` or the compatible upstream toolchain.
 - Network access for declared Gradle/Maven dependencies and the upstream native build tools.
-- Clone the corresponding Git tag with `git clone --recurse-submodules --branch v13.0.10 https://github.com/shoujidi/nullgram.git`. Use `v13.0.10-disguise` for the disguise APK. GitHub automatic source ZIP downloads do not include submodules.
+- Clone the corresponding Git tag with `git clone --recurse-submodules --branch v13.0.11 https://github.com/shoujidi/nullgram.git`. Use `v13.0.11-disguise` for the disguise APK. GitHub automatic source ZIP downloads do not include submodules.
 
 After initializing recursive submodules, apply the preparation patch already
 specified by upstream `.github/workflows/pr.yml`:
